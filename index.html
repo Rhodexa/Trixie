@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trixie Editor</title>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        * {
+            letter-spacing: 2px;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: "Trebuchet MS", Helvetica, sans-serif;
+            background: #252525;
+            color: white;
+        }
+
+        .main {
+            width: 100%;
+            max-width: 800px;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            margin: auto;
+        }
+
+        .panel {
+            width: 100%;
+            padding: 0 2rem;
+            background-color: #424242;
+            border-radius: 0.5rem;
+            padding: 0.8rem 0.8rem;
+            margin-top: 1rem;
+        }
+
+        .search-bar {
+            width: 100%;
+            display: flex;
+            flex-wrap: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            color: white;
+            padding: 0.8rem 0.8rem;
+            font-size: 1.5rem;
+            box-shadow: 0 0 10px #00000011;
+            background-color:#535353;
+            border: 1px solid #b1b1b1;
+            border-radius: 0.5rem;
+            transition: 0.12s;
+        }
+        
+            .search-bar:focus {
+                outline: 1px solid #838383;
+                outline-offset: 1px;
+                background-color:#636363;
+            }
+        
+        td {
+            padding: 0.2rem 1rem;
+            height: 2rem;
+        }
+        
+        table tr:nth-child(even) {
+            background-color: #00000011;
+        }
+
+        table tr:hover {
+            background-color: #ffffff2f;
+        }
+
+
+        button {
+            width: 100%;
+            height: 100%;
+            border-radius: 5px;
+            border: none;
+            margin: 0.5rem;
+            font-weight: bold;
+            font-size: large;
+            letter-spacing: normal;
+            cursor: pointer;
+            color: #ffffff;
+            background-color: #00000000;
+            border: 1px solid #91652c;
+        }
+            button:hover{
+                color: #ffffff;
+                background-color: #996a2d;
+                border: 1px solid #bb9360;
+            }
+
+        span.switch {
+            display: inline-block;
+            position: relative;
+            width: 50px;
+            height: 25px;
+            background: #3d3d3d;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: inset 0 0 10px #0000005b;
+        }
+
+        span.switch::before {
+            content: "";
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 21px;
+            height: 21px;
+            background: #ffffff93;
+            border-radius: 50%;
+            transition: transform 0.12s;
+        }
+
+        /* Checked state */
+        input[type="checkbox"]:checked + span.switch {
+            background: #4caf50;
+        }
+
+        input[type="checkbox"]:checked + span.switch::before {
+            transform: translateX(25px);
+            background: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <div class="main">
+        <input type="text" class="search-bar" placeholder="Buscar..." />
+
+        <div style="width: 100%; display: flex; flex-wrap: nowrap;">
+            <button onclick="renderTable(results)"> Mostar Todos </button>
+            <button> Sólo Activados </button>
+            <button> Sólo Desactivados </button>
+        </div>
+        
+        <div class="panel results-table" id="results">
+        </div>
+    </div>
+
+
+
+    <!--- FOOTER --->
+    <div style="width: 100%; padding: 0.5rem 1rem; color: white; font-size: 0.8rem; opacity: 0.5; text-align: right; letter-spacing: 0px; z-index: -1000; position: sticky; bottom: 0;">
+        <img onerror="this.style.display='none';" style="width: 4rem;" src="https://www.freeradius.org/img/octo-signal.svg">
+        <div>Powered by FreeRADIUS</div>
+        Made by <b style="letter-spacing: 0px;">Rhodune! Lab</b> with Love ❤️ — @rhodexa_lab
+        <div style="width: 1rem; height: 0"></div>
+    </div>
+
+    <script>
+        const results = [
+            { name: "Minerva Dawn", username: "minerva", enabled: true },
+            { name: "Ember Spitfire", username: "ember", enabled: false },
+            { name: "Juno Wraith", username: "juno", enabled: true },
+            { name: "Axel Nightshade", username: "axel", enabled: false },
+            { name: "Nova Flux", username: "nova", enabled: true },
+            { name: "Kieran Hollow", username: "kieran", enabled: true },
+            { name: "Lyra Moth", username: "lyra", enabled: false },
+            { name: "Dorian Vex", username: "dorian", enabled: true },
+            { name: "Tess Oblique", username: "tess", enabled: false },
+            { name: "Zeke Drift", username: "zeke", enabled: true },
+            { name: "Aria Null", username: "aria", enabled: false },
+            { name: "Felix Cipher", username: "felix", enabled: true },
+            { name: "Bliss Razor", username: "bliss", enabled: false },
+            { name: "Kai Zenith", username: "kai", enabled: true },
+            { name: "Echo Fern", username: "echo", enabled: true },
+            { name: "Silas Greyscale", username: "silas", enabled: false },
+            { name: "Nyx Vale", username: "nyx", enabled: true },
+            { name: "Quinn Fathom", username: "quinn", enabled: false },
+            { name: "Vera Shard", username: "vera", enabled: true },
+            { name: "Cass Rune", username: "cass", enabled: false },
+            { name: "Riven Trace", username: "riven", enabled: true },
+            { name: "Ivy Solstice", username: "ivy", enabled: true },
+            { name: "Milo Verge", username: "milo", enabled: false },
+            { name: "Sable Jet", username: "sable", enabled: true },
+            { name: "Orion Coil", username: "orion", enabled: false },
+            { name: "Ashen Locke", username: "ashen", enabled: true },
+            { name: "Twinkleberry Stardust", username: "twinklestar", enabled: true },
+            { name: "Princess Gumdrop Glitterhorn", username: "gumdropglitter", enabled: false },
+            { name: "Celestabelle Bethany Serenity", username: "celestabelle", enabled: true },
+            { name: "Lollipop Sparklefizz", username: "sparklefizz", enabled: true },
+            { name: "Moonbeam Snugglewinks", username: "snugglemoon", enabled: false },
+            { name: "Fluffernoodle Wiggletuft", username: "fluffwiggle", enabled: true },
+            { name: "Bubblegum Twirlwhisk", username: "bubtwirl", enabled: true },
+            { name: "Captain Marshmallow Sprinklepants", username: "capnmarsh", enabled: false },
+            { name: "Chrysanthemum Dandelion Featherlight", username: "chrysandfeather", enabled: true },
+            { name: "Rainbow Snickerdoodle McSparkleface", username: "snickermcsparkle", enabled: false },
+            { name: "Seraphina Featherquartz Petalbliss", username: "serapetal", enabled: true }
+        ];
+
+
+        function renderTable(data) {
+            const container = document.getElementById("results");
+            container.innerHTML = `
+                <table style="width: 100%; color: white; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th></th>
+                            <th></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(user => `
+                            <tr>
+                                <td>${user.name}</td>
+                                <td>${user.username}</td>
+                                <td>
+                                    <iconify-icon icon="mdi:edit" style="transform: scale(1.5);"></iconify-icon>
+                                </td>
+                                <td>
+                                    <label style="margin: auto">
+                                        <input type="checkbox" style="display: none" ${user.enabled ? "checked" : ""}>
+                                        <span class="switch"></span>
+                                    </label>
+                                </td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            `;
+        }
+    </script>
+</body>
+</html>

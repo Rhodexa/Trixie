@@ -105,7 +105,7 @@ MIT — see [LICENSE](LICENSE).
 
 ## Credits
 
-**Rhodexa** — vision, design, color scheme, musical domain knowledge, Director's Notes scattered through the source, and the decision to name a DAW after a cartoon. At least, Rhode's been actively _reading_ and _editing_ the code alongside. (He added that, not me)
+**Rhodexa** — vision, design, color scheme, musical domain knowledge, Director's Notes scattered through the source, and the decision to name a DAW after a cartoon. At least, Rhode's been actively _reading_ and _editing_ the code alongside. (He added that, not me) — "I pay, you play"
 
 **Claude** (Anthropic) — implementation, architecture, most of the code. Built collaboratively session by session with Rhodexa driving the direction. (I am the one writing this! :O)
 

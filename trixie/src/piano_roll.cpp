@@ -8,18 +8,10 @@
 
 #include <cmath>
 #include <algorithm>
+#include <cstdint>
 
-static constexpr float PIANO_STRIP_WIDTH = 60.0f;
+static constexpr float PIANO_STRIP_WIDTH = 68.0f;
 
-// Which semitones within an octave are black keys (index 0 = C).
-// This is a LUT — later it can be swapped out for alternate tuning layouts.
-// Director's note: No. at least, not like that... 
-// There are two LUTs: This is the one that draws the keyboard.
-// The second LUT defaults to a copy of this one and it is meant to show the _scale_ on the lanes
-static constexpr bool IS_BLACK_KEY[12] = {
-    false, true,  false, true,  false,
-    false, true,  false, true,  false, true, false
-};
 
 // true means this note is "not used"
 bool SCALE_LUT[12] = {
@@ -134,79 +126,93 @@ static void draw_notes(NVGcontext* nvg, const Song& song, const Camera& cam,
 }
 
 
-staic void draw_octave(NVGcontext* nvg, float width, float height, uint16_fast_t on_keys = 0b000000000000){
-    float pitch_width = 1/12; // how _thick_ a key bar is
-    float white_width = 1/7;  // thickness of a white key
-    int white_map[7] = {0, 2, 4, 5, 7, 9, 11};
-    int black_map[5] = {1, 3, 6, 8, 10};
-    float black_position_map[5] =
-    {
-        pitch_width*0.5,
-        pitch_width*2.5,
-        pitch_width*5.5,
-        pitch_width*7.5,
-        pitch_width*9.5
-    };
-    
-    // Draw white keys:
-    for( int i = 0; i < 7; i++) {
+// Normalized geometry for one piano octave, authored C-on-top (y=0 = top of C key).
+// Positions are in [0,1] relative to octave height. Black keys overlap adjacent whites,
+// matching real piano geometry. 7 white keys × h=0.143 ≈ 1.0 (fills the octave).
+struct KeyDef { float y, h; bool black; };
+
+static constexpr KeyDef KEY_DEFS[12] = {
+    { 0.000f, 0.143f, false }, // C
+    { 0.083f, 0.082f, true  }, // C#
+    { 0.143f, 0.143f, false }, // D
+    { 0.250f, 0.082f, true  }, // D#
+    { 0.286f, 0.143f, false }, // E
+    { 0.429f, 0.143f, false }, // F
+    { 0.500f, 0.082f, true  }, // F#
+    { 0.571f, 0.143f, false }, // G
+    { 0.667f, 0.082f, true  }, // G#
+    { 0.714f, 0.143f, false }, // A
+    { 0.833f, 0.082f, true  }, // A#
+    { 0.857f, 0.143f, false }, // B
+};
+
+// Draws one octave of keys into a [0,width] × [0,height] local region.
+// The call site provides a y-flip transform so C lands at the band's bottom,
+// matching the piano roll's pitch ordering (high pitch = low y).
+// on_keys: bitmask, bit 0 = C, bit 11 = B.
+static void draw_octave(NVGcontext* nvg, float width, float height, uint16_t on_keys = 0) {
+    // White keys first (background layer)
+    for (int i = 0; i < 12; i++) {
+        const KeyDef& k = KEY_DEFS[i];
+        if (k.black) continue;
         nvgBeginPath(nvg);
-        nvgRect(nvg, 0.0f, 0.0f, white_width, width);
-        if(on_keys & (1 << white_map[i])) nvgFillColor(nvg, nvgRGBf(0.643f, 0.990f, 0.938f)); // blueish tint for held whites 
-        else if (i == 0) nvgFillColor(nvg, nvgRGBf(0.93f, 0.92f, 0.90f)); // a bit darker C
-        else nvgFillColor(nvg, nvgRGBf(0.96f, 0.95f, 0.93f)); // Ivory white keys
+            nvgRect(nvg, 0.0f, k.y * height, width, k.h * height);
+            if      (on_keys & (1 << i))    nvgFillColor(nvg, nvgRGBf(0.0f, 0.737f, 0.859f)); // held
+            else if ((i == 0) || (i == 5))  nvgFillColor(nvg, nvgRGBf(0.85f,  0.85f,  0.85f )); // C: slightly darker
+            else                            nvgFillColor(nvg, nvgRGBf(0.96f,  0.95f,  0.93f )); 
+
+            nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.3f));
+            nvgStrokeWidth(nvg, 1.0f);
+            nvgStroke(nvg);
         nvgFill(nvg);
     }
 
-    // Draw black keys:
-    for( int i = 0; i < 5; i++) {
+    // Black keys on top
+    for (int i = 0; i < 12; i++) {
+        const KeyDef& k = KEY_DEFS[i];
+        if (!k.black) continue;
         nvgBeginPath(nvg);
-        nvgRect(nvg, 0.0f, 0.0f, pitch_width, width * 0.63);
-        if(on_keys & (1 << black_map[i])) nvgFillColor(nvg, nvgRGBf(0.0415f, 0.830f, 0.712f)); // blueish tint for held blacks
-        else nvgFillColor(nvg, nvgRGBf(0.10f, 0.09f, 0.09f)); // Ebony black keys
+            nvgRect(nvg, 0.0f, k.y * height, width * 0.66f, k.h * height);
+            if (on_keys & (1 << i)) nvgFillColor(nvg, nvgRGBf(0.0f, 0.737f, 0.859f)); // held
+            else                    nvgFillColor(nvg, nvgRGBf(0.10f,   0.09f,  0.09f )); // ebony
         nvgFill(nvg);
     }
-    
-    // E/F separator
-    nvgBeginPath(nvg);
-    nvgMoveTo(nvg, 0.0f, pitch_width * 5);
-    nvgLineTo(nvg, width, pitch_width * 5);
-    nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.5f));
-    nvgStrokeWidth(nvg, 2.0f);
-    nvgStroke(nvg);
 }
 
-// We'll replace this with a more appropriate piano drawing tool
 static void draw_piano_strip(NVGcontext* nvg, const Camera& cam, int view_height) {
-    // 
-    // Background
+    float w = PIANO_STRIP_WIDTH;
+
+    // Ivory base — fills gaps at extremes of the MIDI range
     nvgBeginPath(nvg);
-    nvgRect(nvg, 0.0f, 0.0f, PIANO_STRIP_WIDTH, (float)view_height);
-    nvgFillColor(nvg, nvgRGBf(0.96f, 0.95f, 0.93f)); // ivory white keys
+    nvgRect(nvg, 0.0f, 0.0f, w, (float)view_height);
+    nvgFillColor(nvg, nvgRGBf(0.96f, 0.95f, 0.93f));
     nvgFill(nvg);
 
-    // Black key blocks
-    int first_pitch = 127 - (int)floorf(cam.scroll_y / cam.lane_height);
-    int last_pitch  = 127 - (int)floorf((cam.scroll_y + view_height) / cam.lane_height) - 1;
-    first_pitch = std::min(first_pitch, 127);
-    last_pitch  = std::max(last_pitch,  0);
+    // One draw_octave call per visible octave.
+    // Within each band: B (highest pitch) sits at the TOP, C at the BOTTOM.
+    // KEY_DEFS is C-on-top, so we translate to y_bottom then flip y before drawing.
+    for (int oct = 0; oct <= 10; oct++) {
+        int   pitch_lo = oct * 12;
+        int   pitch_hi = std::min(pitch_lo + 11, 127);
+        float y_top    = (127 - pitch_hi) * cam.lane_height - cam.scroll_y;
+        float y_bottom = (127 - pitch_lo) * cam.lane_height + cam.lane_height - cam.scroll_y;
+        float band_h   = y_bottom - y_top;
 
-    for (int pitch = last_pitch; pitch <= first_pitch; pitch++) {
-        if (!IS_BLACK_KEY[pitch % 12]) continue;
-        float y = pitch_to_y(pitch, cam);
+        if (y_bottom < 0.0f || y_top > (float)view_height) continue;
 
-        nvgBeginPath(nvg);
-        nvgRect(nvg, 0.0f, y + 1.5f, PIANO_STRIP_WIDTH * 0.65f, cam.lane_height - 3.0f);
-        nvgFillColor(nvg, nvgRGBf(0.10f, 0.09f, 0.09f)); // near-black ebony
-        nvgFill(nvg);
+        nvgSave(nvg);
+        nvgTranslate(nvg, 0.0f, y_bottom); // origin at bottom of band
+        nvgScale(nvg, 1.0f, -1.0f);        // C (y=0) → bottom, B (y≈0.857) → top
+        draw_octave(nvg, w, band_h, 0);
+        nvgRestore(nvg);
     }
 
-    // Right-edge separator line
+    // Right-edge separator
     nvgBeginPath(nvg);
-    nvgMoveTo(nvg, PIANO_STRIP_WIDTH, 0.0f);
-    nvgLineTo(nvg, PIANO_STRIP_WIDTH, (float)view_height);
-    nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.5f));
-    nvgStrokeWidth(nvg, 2.0f);
+    nvgMoveTo(nvg, w, 0.0f);
+    nvgLineTo(nvg, w, (float)view_height);
+    nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 1.0f));
+    nvgStrokeWidth(nvg, 1.0f);
     nvgStroke(nvg);
 }
 

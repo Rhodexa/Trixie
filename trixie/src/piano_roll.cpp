@@ -210,6 +210,10 @@ void piano_roll_draw_cursor(NVGcontext* nvg, const Song& song, const Panel& pane
 
 // --- hit testing / coordinate inversion ---
 
+// Width of the head/tail drag handles in pixels.
+// Notes narrower than 2× this are treated as body-only.
+static constexpr float HANDLE_WIDTH = 8.0f;
+
 std::optional<NoteHit> piano_roll_hit_test(const Song& song, const Panel& panel, float mx, float my) {
     const Camera& cam = panel.camera;
     for (int t = 0; t < (int)song.tracks.size(); t++) {
@@ -220,11 +224,37 @@ std::optional<NoteHit> piano_roll_hit_test(const Song& song, const Panel& panel,
             float x1 = beat_to_x((float)(n.start + n.duration)   / song.ppq, cam);
             float y0 = pitch_to_y(n.pitch, cam);
             float y1 = y0 + cam.lane_height;
-            if (mx >= x0 && mx < x1 && my >= y0 && my < y1)
-                return NoteHit{ t, i };
+            if (mx < x0 || mx >= x1 || my < y0 || my >= y1) continue;
+
+            float w = x1 - x0;
+            NotePart part;
+            if (w < HANDLE_WIDTH * 2.0f) {
+                part = NotePart::BODY;
+            } else if (mx < x0 + HANDLE_WIDTH) {
+                part = NotePart::HEAD;
+            } else if (mx >= x1 - HANDLE_WIDTH) {
+                part = NotePart::TAIL;
+            } else {
+                part = NotePart::BODY;
+            }
+            return NoteHit{ t, i, part };
         }
     }
     return std::nullopt;
+}
+
+Tick piano_roll_x_to_tick(const Song& song, const Panel& panel, float mx, Tick snap_ticks) {
+    const Camera& cam = panel.camera;
+    float beat = (mx - PIANO_STRIP_WIDTH + cam.scroll_x) / cam.pixels_per_beat;
+    Tick raw = (Tick)(beat * song.ppq);
+    if (raw < 0) raw = 0;
+    return (snap_ticks > 0) ? (raw / snap_ticks) * snap_ticks : raw;
+}
+
+int piano_roll_y_to_pitch(const Panel& panel, float my) {
+    const Camera& cam = panel.camera;
+    int pitch = 127 - (int)floorf((my + cam.scroll_y) / cam.lane_height);
+    return std::clamp(pitch, 0, 127);
 }
 
 std::optional<Note> piano_roll_make_note(const Song& song, const Panel& panel,

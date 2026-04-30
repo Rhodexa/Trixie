@@ -28,6 +28,22 @@ struct AddNoteCommand : Command {
     }
 };
 
+// Generic before/after command — covers move, head-resize, tail-resize, or any property change.
+// The live preview mutates the note directly during drag; this records the endpoints for undo.
+struct EditNoteCommand : Command {
+    Song& song;
+    int   track;
+    int   note_idx;
+    Note  before;
+    Note  after;
+
+    EditNoteCommand(Song& s, int t, int idx, const Note& b, const Note& a, std::string desc)
+        : song(s), track(t), note_idx(idx), before(b), after(a) { description = std::move(desc); }
+
+    void execute() override { song.tracks[track].notes[note_idx] = after; }
+    void undo()    override { song.tracks[track].notes[note_idx] = before; }
+};
+
 struct RemoveNoteCommand : Command {
     Song& song;
     int   track;

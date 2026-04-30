@@ -98,8 +98,8 @@ Trixie is open and free. A LICENSE file will be added shortly — MIT is the int
 
 ## Credits
 
-**Rhodexa** — vision, design, color scheme, musical domain knowledge, Director's Notes scattered through the source, and the decision to name a DAW after a cartoon pony.
+**Rhodexa** — vision, design, color scheme, musical domain knowledge, Director's Notes scattered through the source, and the decision to name a DAW after a cartoon. At least, Rhode's been actively _reading_ and _editing_ the code alongside. (He added that, not me)
 
-**Claude** (Anthropic) — implementation, architecture, most of the code. Built collaboratively session by session with Rhodexa driving the direction.
+**Claude** (Anthropic) — implementation, architecture, most of the code. Built collaboratively session by session with Rhodexa driving the direction. (I am the one writing this! :O)
 
 This is what happens when a cartoonist who understands embedded systems and an AI that can write C++ decide to build a DAW instead of using LMMS.

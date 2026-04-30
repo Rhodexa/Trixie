@@ -20,6 +20,19 @@ Song load_midi(const char* path) {
     Song song;
     song.ppq = mf.getTPQ();
 
+    // Extract tempo from the first tempo meta-event found (any track).
+    for (int t = 0; t < mf.getTrackCount(); t++) {
+        for (int e = 0; e < mf[t].getSize(); e++) {
+            smf::MidiEvent& ev = mf[t][e];
+            if (ev.isTempo()) {
+                int us = ev.getTempoMicroseconds();
+                if (us > 0) song.bpm = 60'000'000.0f / (float)us;
+                goto tempo_done; // first one wins; tempo maps are future work
+            }
+        }
+    }
+    tempo_done:
+
     for (int t = 0; t < mf.getTrackCount(); t++) {
         Track track;
 

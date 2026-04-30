@@ -21,9 +21,12 @@ void piano_roll_draw_cursor(NVGcontext* nvg, const Song& song, const Panel& pane
 
 // --- hit testing ---
 
-struct NoteHit { int track; int note_idx; };
+// Which part of a note was hit. Determines drag behaviour.
+enum class NotePart { HEAD, BODY, TAIL };
 
-// Returns the first note whose pixel rect contains (mx, my), or nullopt.
+struct NoteHit { int track; int note_idx; NotePart part; };
+
+// Returns the first note whose pixel rect (plus handle zones) contains (mx, my).
 std::optional<NoteHit> piano_roll_hit_test(const Song& song, const Panel& panel, float mx, float my);
 
 // Converts (mx, my) to a snapped Note ready for insertion.
@@ -31,3 +34,11 @@ std::optional<NoteHit> piano_roll_hit_test(const Song& song, const Panel& panel,
 std::optional<Note> piano_roll_make_note(const Song& song, const Panel& panel,
                                          float mx, float my,
                                          Tick snap_ticks, Tick dur_ticks, int velocity);
+
+// --- coordinate helpers (used by drag logic in the render thread) ---
+
+// Converts pixel x to a tick. Pass snap_ticks=0 for raw (unsnapped) result.
+Tick piano_roll_x_to_tick(const Song& song, const Panel& panel, float mx, Tick snap_ticks);
+
+// Converts pixel y to a pitch (0–127, clamped).
+int  piano_roll_y_to_pitch(const Panel& panel, float my);

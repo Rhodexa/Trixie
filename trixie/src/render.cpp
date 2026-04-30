@@ -40,10 +40,21 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
     Panel   piano_roll_panel;
     Journal journal;
 
+    // --- input state ---
     bool mmb_held    = false;
     bool rmb_held    = false;
+
+    // LMB: place new note
     bool lmb_placing = false;
     std::optional<Note> pending_note;
+
+    // LMB: drag existing note (head / body / tail)
+    bool     lmb_dragging_note = false;
+    int      drag_track        = -1;
+    int      drag_note_idx     = -1;
+    NotePart drag_part         = NotePart::BODY;
+    Note     drag_original     = {};
+    Tick     drag_tick_offset  = 0; // cursor tick – note.start at grab time (body drag only)
 
     bool camera_initialized = false;
 
@@ -87,15 +98,39 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
                     } else if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
                         if (e.pressed) {
                             auto hit = piano_roll_hit_test(song, piano_roll_panel, e.x, e.y);
-                            if (!hit && !song.tracks.empty()) {
+                            if (hit) {
+                                // Grab an existing note for drag
+                                lmb_dragging_note = true;
+                                drag_track        = hit->track;
+                                drag_note_idx     = hit->note_idx;
+                                drag_part         = hit->part;
+                                drag_original     = song.tracks[hit->track].notes[hit->note_idx];
+                                // Body drag: preserve relative grab offset within the note
+                                Tick cursor_tick  = piano_roll_x_to_tick(song, piano_roll_panel, e.x, 0);
+                                drag_tick_offset  = cursor_tick - drag_original.start;
+                            } else if (!song.tracks.empty()) {
+                                // Start placing a new note
                                 auto note = piano_roll_make_note(song, piano_roll_panel,
                                                                  e.x, e.y, snap_ticks, snap_ticks, 100);
-                                if (note) {
-                                    pending_note = note;
-                                    lmb_placing  = true;
-                                }
+                                if (note) { pending_note = note; lmb_placing = true; }
                             }
                         } else {
+                            // LMB release — commit whichever operation was in flight
+                            if (lmb_dragging_note) {
+                                Note& cur = song.tracks[drag_track].notes[drag_note_idx];
+                                if (cur.start != drag_original.start ||
+                                    cur.pitch != drag_original.pitch  ||
+                                    cur.duration != drag_original.duration) {
+                                    Note final = cur;
+                                    journal.commit(std::make_unique<EditNoteCommand>(
+                                        song, drag_track, drag_note_idx,
+                                        drag_original, final,
+                                        drag_part == NotePart::BODY ? "Move note" :
+                                        drag_part == NotePart::TAIL ? "Resize note tail" :
+                                                                       "Resize note head"));
+                                }
+                                lmb_dragging_note = false;
+                            }
                             if (lmb_placing && pending_note)
                                 journal.commit(std::make_unique<AddNoteCommand>(song, 0, *pending_note, "Add note"));
                             lmb_placing  = false;
@@ -104,10 +139,11 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
 
                     } else if (e.button == GLFW_MOUSE_BUTTON_RIGHT) {
                         rmb_held = e.pressed;
-                        if (e.pressed) {
+                        if (e.pressed && !lmb_dragging_note) {
                             auto hit = piano_roll_hit_test(song, piano_roll_panel, e.x, e.y);
                             if (hit)
-                                journal.commit(std::make_unique<RemoveNoteCommand>(song, hit->track, hit->note_idx, "Remove note"));
+                                journal.commit(std::make_unique<RemoveNoteCommand>(
+                                    song, hit->track, hit->note_idx, "Remove note"));
                         }
                     }
 
@@ -116,15 +152,43 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
                         piano_roll_panel.camera.scroll_x = std::max(0.0f, piano_roll_panel.camera.scroll_x - e.dx);
                         piano_roll_panel.camera.scroll_y = std::max(0.0f, piano_roll_panel.camera.scroll_y - e.dy);
                     }
+
                     if (lmb_placing) {
                         auto note = piano_roll_make_note(song, piano_roll_panel,
                                                          e.x, e.y, snap_ticks, snap_ticks, 100);
                         if (note) pending_note = note;
                     }
-                    if (rmb_held) {
+
+                    if (lmb_dragging_note) {
+                        Note& note         = song.tracks[drag_track].notes[drag_note_idx];
+                        Tick  original_end = drag_original.start + drag_original.duration;
+
+                        if (drag_part == NotePart::BODY) {
+                            Tick raw     = piano_roll_x_to_tick(song, piano_roll_panel, e.x, 0) - drag_tick_offset;
+                            Tick snapped = (snap_ticks > 0) ? (raw / snap_ticks) * snap_ticks : raw;
+                            note.start   = std::max(0LL, snapped);
+                            note.pitch   = piano_roll_y_to_pitch(piano_roll_panel, e.y);
+
+                        } else if (drag_part == NotePart::TAIL) {
+                            Tick raw_end     = piano_roll_x_to_tick(song, piano_roll_panel, e.x, 0);
+                            Tick snapped_end = (snap_ticks > 0) ? (raw_end / snap_ticks) * snap_ticks : raw_end;
+                            Tick min_end     = note.start + snap_ticks;
+                            note.duration    = std::max(snapped_end, min_end) - note.start;
+
+                        } else { // HEAD
+                            Tick raw_start  = piano_roll_x_to_tick(song, piano_roll_panel, e.x, 0);
+                            Tick snapped    = (snap_ticks > 0) ? (raw_start / snap_ticks) * snap_ticks : raw_start;
+                            Tick max_start  = original_end - snap_ticks;
+                            note.start      = std::clamp(snapped, 0LL, max_start);
+                            note.duration   = original_end - note.start;
+                        }
+                    }
+
+                    if (rmb_held && !lmb_dragging_note) {
                         auto hit = piano_roll_hit_test(song, piano_roll_panel, e.x, e.y);
                         if (hit)
-                            journal.commit(std::make_unique<RemoveNoteCommand>(song, hit->track, hit->note_idx, "Remove note"));
+                            journal.commit(std::make_unique<RemoveNoteCommand>(
+                                song, hit->track, hit->note_idx, "Remove note"));
                     }
 
                 } else if constexpr (std::is_same_v<T, KeyEvent>) {

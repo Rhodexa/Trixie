@@ -1,4 +1,4 @@
-# Trixie DAW
+# Trixie DAW v0.1.1.0252300426
 
 A digital audio workstation built from scratch. Not a fork. Built with absolute love, from us, to you
 

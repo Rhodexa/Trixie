@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cmake --build build)"
+      "Bash(cmake --build build)",
+      "Bash(cmake --build build --config Debug)"
     ]
   }
 }

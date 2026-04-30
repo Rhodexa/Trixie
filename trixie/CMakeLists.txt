@@ -57,12 +57,16 @@ add_executable(trixie
     src/input_queue.cpp
     src/playback_engine.cpp
     src/midi_out_plugin.cpp
+    src/toolbar.cpp
 )
 
 target_include_directories(trixie PRIVATE src)
 
 # GLFW_INCLUDE_NONE: glad owns all OpenGL declarations — GLFW must not pull its own.
-target_compile_definitions(trixie PRIVATE GLFW_INCLUDE_NONE)
+target_compile_definitions(trixie PRIVATE
+    GLFW_INCLUDE_NONE
+    TRIXIE_ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets"
+)
 
 target_link_libraries(trixie PRIVATE
     glfw

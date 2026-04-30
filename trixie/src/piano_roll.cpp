@@ -184,6 +184,10 @@ void piano_roll_draw_ghost(NVGcontext* nvg, const Song& song, const Panel& panel
     float nh     = h - inset * 2.0f;
     float radius = std::min(2.0f, std::min(nw, nh) * 0.5f);
 
+    nvgSave(nvg);
+    nvgScissor(nvg, panel.x, panel.y, panel.w, panel.h);
+    nvgTranslate(nvg, panel.x, panel.y);
+
     nvgBeginPath(nvg);
     nvgRoundedRect(nvg, x + inset, y + inset, nw, nh, radius);
     nvgFillColor(nvg,   nvgRGBAf(1.0f, 1.0f, 1.0f, 0.22f));
@@ -191,6 +195,8 @@ void piano_roll_draw_ghost(NVGcontext* nvg, const Song& song, const Panel& panel
     nvgStrokeColor(nvg, nvgRGBAf(1.0f, 1.0f, 1.0f, 0.75f));
     nvgStrokeWidth(nvg, 1.5f);
     nvgStroke(nvg);
+
+    nvgRestore(nvg);
 }
 
 // --- playback cursor ---
@@ -200,12 +206,18 @@ void piano_roll_draw_cursor(NVGcontext* nvg, const Song& song, const Panel& pane
     float x = beat_to_x((float)cursor_tick / song.ppq, cam);
     if (x < PIANO_STRIP_WIDTH || x > panel.w) return;
 
+    nvgSave(nvg);
+    nvgScissor(nvg, panel.x, panel.y, panel.w, panel.h);
+    nvgTranslate(nvg, panel.x, panel.y);
+
     nvgBeginPath(nvg);
     nvgMoveTo(nvg, x, 0.0f);
     nvgLineTo(nvg, x, panel.h);
     nvgStrokeColor(nvg, nvgRGBAf(1.0f, 0.78f, 0.18f, 0.9f)); // warm amber
     nvgStrokeWidth(nvg, 1.5f);
     nvgStroke(nvg);
+
+    nvgRestore(nvg);
 }
 
 // --- hit testing / coordinate inversion ---
@@ -276,8 +288,15 @@ void draw_piano_roll(NVGcontext* nvg, const Song& song, const Panel& panel) {
     int view_width  = (int)panel.w;
     int view_height = (int)panel.h;
     const Camera& camera = panel.camera;
+
+    nvgSave(nvg);
+    nvgScissor(nvg, panel.x, panel.y, panel.w, panel.h);
+    nvgTranslate(nvg, panel.x, panel.y);
+
     draw_pitch_lanes(nvg, camera, view_width, view_height);
     draw_grid_lines(nvg, camera, view_width, view_height);
     draw_notes(nvg, song, camera, view_width, view_height);
-    draw_piano_strip(nvg, camera, view_height); // drawn last so it overlays the scroll
+    draw_piano_strip(nvg, camera, view_height);
+
+    nvgRestore(nvg);
 }

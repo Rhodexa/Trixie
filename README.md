@@ -1,8 +1,6 @@
 # Trixie
 
-A digital audio workstation built from scratch. Not a fork of anything.
-
-> *The name is a My Little Pony reference. It works as a public-facing name without the reference being obvious. It implies cleverness. Both things are intentional.*
+A digital audio workstation built from scratch. Not a fork. Built with absolute love, from us, to you
 
 ---
 

@@ -6,7 +6,7 @@ A digital audio workstation built from scratch. Not a fork. Built with absolute 
 
 ## What it is
 
-Trixie is a pattern-based DAW targeting a workflow similar to FL Studio — fast, composable, and built around the piano roll as a first-class citizen. The long-term stack includes CLAP/VST3/LV2 plugin hosting, a built-in chip synth, a mixer, and an arrangement view.
+Trixie is a pattern-based DAW targeting a workflow similar to FLS — fast, composable, and built around the piano roll as a first-class citizen. The long-term stack includes CLAP/VST3/LV2 plugin hosting, a built-in chip synth, a mixer, and an arrangement view.
 
 **Right now** it is a working piano roll with MIDI playback. That's not nothing.
 
@@ -15,10 +15,12 @@ What actually works today:
 - Piano roll renders up to 128 pitches with scale-aware lane coloring
 - Navigation: MMB drag to pan, scroll wheel to scroll, Ctrl+scroll for horizontal
 - LMB drag to place notes (ghost preview while dragging, snaps to quarter-note grid)
+- LMB drag existing notes to move (body), resize from the left (head), or resize from the right (tail)
 - RMB hold to wipe notes (drag across multiple)
 - Full undo/redo via a Journal/Command system — Ctrl+Z / Ctrl+Shift+Z
-- MIDI file loading (reads any standard .mid file)
+- MIDI file loading (reads any standard .mid file, extracts tempo)
 - Playback via Windows MIDI output (Space to play/stop), with a live cursor line
+- Toolbar strip showing live bar:beat position and BPM, with a playback indicator
 - Render thread separated from the OS event thread — no freeze on window drag
 
 ## Why not fork LMMS?
@@ -52,6 +54,7 @@ On first play (Space), Trixie routes MIDI to whatever Windows has set as the def
 | glad | Vendored (`external/glad/`) | OpenGL 3.3 core loader, pre-generated |
 | NanoVG | Vendored (`external/nanovg/`) | Vector graphics for the piano roll canvas |
 | midifile | Vendored (`external/midifile/`) | MIDI file parsing |
+| JetBrains Mono | Bundled (`assets/fonts/`) | UI font — OFL 1.1 licensed |
 
 NanoVG and midifile are vendored because they are unmaintained upstream and we may need to patch them. glad is pre-generated to eliminate the Python/jinja2 build dependency.
 
@@ -71,15 +74,20 @@ Every user action that mutates project state goes through a **Journal** (command
 
 The instrument backend is a plugin interface (`InstrumentPlugin`). Currently `MidiOutPlugin` routes to the OS MIDI stack. A built-in chip synth will slot in behind the same interface without touching anything else.
 
+Layout is driven by a simple **Box split system** — the window is carved into regions each frame using `box_split_top/left/right/bottom`. No runtime tree, no heap, no dirty flags. Each widget receives its box, draws inside it using NanoVG scissor+translate, and has no knowledge of where it sits on screen. Mouse coordinates are localized to panel space at the dispatch boundary in the render thread, so widget logic never sees window coordinates.
+
 ## Roadmap
 
 ### v0.1 — Proof of Life (in progress)
 - [x] Window + OpenGL + NanoVG piano roll
 - [x] Pan and scroll navigation
 - [x] Note placement and deletion
+- [x] Note drag-to-move, head/tail resize
 - [x] Undo / redo (Journal)
 - [x] MIDI file loading
 - [x] Playback with live cursor
+- [x] Toolbar widget with transport display
+- [x] Box layout system with proper widget isolation
 - [ ] Built-in synthesizer (chip/wavetable)
 - [ ] Project save and load
 
@@ -90,11 +98,10 @@ The instrument backend is a plugin interface (`InstrumentPlugin`). Currently `Mi
 - VST3 / LV2 compatibility
 - Linux support (the actual long-term target platform)
 - Scrollbars, snap UI, zoom controls
-- Note drag-to-move, tail-drag-to-resize
 
 ## License
 
-Trixie is open and free. A LICENSE file will be added shortly — MIT is the intended choice. Until then, treat it as MIT.
+MIT — see [LICENSE](LICENSE).
 
 ## Credits
 

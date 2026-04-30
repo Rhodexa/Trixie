@@ -153,6 +153,7 @@ staic void draw_octave(NVGcontext* nvg, float width, float height, uint16_fast_t
         nvgBeginPath(nvg);
         nvgRect(nvg, 0.0f, 0.0f, white_width, width);
         if(on_keys & (1 << white_map[i])) nvgFillColor(nvg, nvgRGBf(0.643f, 0.990f, 0.938f)); // blueish tint for held whites 
+        else if (i == 0) nvgFillColor(nvg, nvgRGBf(0.93f, 0.92f, 0.90f)); // a bit darker C
         else nvgFillColor(nvg, nvgRGBf(0.96f, 0.95f, 0.93f)); // Ivory white keys
         nvgFill(nvg);
     }
@@ -160,7 +161,7 @@ staic void draw_octave(NVGcontext* nvg, float width, float height, uint16_fast_t
     // Draw black keys:
     for( int i = 0; i < 5; i++) {
         nvgBeginPath(nvg);
-        nvgRect(nvg, 0.0f, 0.0f, pitch_width, width);
+        nvgRect(nvg, 0.0f, 0.0f, pitch_width, width * 0.63);
         if(on_keys & (1 << black_map[i])) nvgFillColor(nvg, nvgRGBf(0.0415f, 0.830f, 0.712f)); // blueish tint for held blacks
         else nvgFillColor(nvg, nvgRGBf(0.10f, 0.09f, 0.09f)); // Ebony black keys
         nvgFill(nvg);
@@ -168,8 +169,8 @@ staic void draw_octave(NVGcontext* nvg, float width, float height, uint16_fast_t
     
     // E/F separator
     nvgBeginPath(nvg);
-    nvgMoveTo(nvg, PIANO_STRIP_WIDTH, 0.0f);
-    nvgLineTo(nvg, PIANO_STRIP_WIDTH, (float)view_height);
+    nvgMoveTo(nvg, 0.0f, pitch_width * 5);
+    nvgLineTo(nvg, width, pitch_width * 5);
     nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.5f));
     nvgStrokeWidth(nvg, 2.0f);
     nvgStroke(nvg);

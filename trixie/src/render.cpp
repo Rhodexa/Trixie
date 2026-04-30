@@ -164,23 +164,34 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
                         Tick  original_end = drag_original.start + drag_original.duration;
 
                         if (drag_part == NotePart::BODY) {
-                            Tick raw     = piano_roll_x_to_tick(song, piano_roll_panel, e.x, 0) - drag_tick_offset;
-                            Tick snapped = (snap_ticks > 0) ? (raw / snap_ticks) * snap_ticks : raw;
-                            note.start   = std::max(0LL, snapped);
-                            note.pitch   = piano_roll_y_to_pitch(piano_roll_panel, e.y);
+                            Tick raw   = piano_roll_x_to_tick(song, piano_roll_panel, e.x, 0) - drag_tick_offset;
+                            note.start = std::max(0LL, snap_to_nearest(raw, snap_ticks));
+                            note.pitch = piano_roll_y_to_pitch(piano_roll_panel, e.y);
 
                         } else if (drag_part == NotePart::TAIL) {
+                            /*
+                                Rhode: ok, let me understand this logic:
+                                    * raw_end is where the note's tail is in _ticks_
+                                    * snapped_end would be the predicted position of the tail once snapped <- this is my current point of interest
+                                        (scrapped) raw_end / snap_ticks does basically a floor. This is kind of a flaw in the logic, let me think, i believe snapping of tail should happen away from 0
+                                            Turns out rounding from the midpoint is better.
+                                    * min_end makes sense: a note cannot be smaller than this, basically.
+                                        Thinking about it, I think there are _two_ minimum ends:
+                                            1. this one, which is literally the smallest unit of time
+                                            2. the configured minimum.
+                                            Let me think.
+                                            So, FL Studio, for example, does not limit notes to a minimum tick, instead it has a somewhat larger limit. When a note is _that_ small it turns it into a beat (uses a different rendering style for the note, to signal it cannot be smaller)
+                                            This is useful for percussives. Perhaps, the whole start + snap_ticks is enough for now, but this should be able to be even smaller: by holding alt
+                                            So there _are_ at least two mins, just like for the tail: where you can have raw and snapped, min can be start + snapping, or start + n_ticks (when holding alt). "n_ticks" is just a placeholder, could be 1, 2, 8... idk. Emperical testing would reveal
+                            */
                             Tick raw_end     = piano_roll_x_to_tick(song, piano_roll_panel, e.x, 0);
-                            Tick snapped_end = (snap_ticks > 0) ? (raw_end / snap_ticks) * snap_ticks : raw_end;
-                            Tick min_end     = note.start + snap_ticks;
-                            note.duration    = std::max(snapped_end, min_end) - note.start;
+                            Tick snapped_end = snap_to_nearest(raw_end, snap_ticks);
+                            note.duration    = std::max(snapped_end, note.start + snap_ticks) - note.start;
 
                         } else { // HEAD
-                            Tick raw_start  = piano_roll_x_to_tick(song, piano_roll_panel, e.x, 0);
-                            Tick snapped    = (snap_ticks > 0) ? (raw_start / snap_ticks) * snap_ticks : raw_start;
-                            Tick max_start  = original_end - snap_ticks;
-                            note.start      = std::clamp(snapped, 0LL, max_start);
-                            note.duration   = original_end - note.start;
+                            Tick snapped  = snap_to_nearest(piano_roll_x_to_tick(song, piano_roll_panel, e.x, 0), snap_ticks);
+                            note.start    = std::clamp(snapped, 0LL, original_end - snap_ticks);
+                            note.duration = original_end - note.start;
                         }
                     }
 

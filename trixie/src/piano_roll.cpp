@@ -211,7 +211,8 @@ void piano_roll_draw_cursor(NVGcontext* nvg, const Song& song, const Panel& pane
 // --- hit testing / coordinate inversion ---
 
 // Width of the head/tail drag handles in pixels.
-// Notes narrower than 2× this are treated as body-only.
+// Notes narrower than 2× this are treated as body-only. DN: This is problematic, because it means tiny notes cannot be resized. I belive it makes sense to have head and tail _handles_ extend _beyond_ the body size. This would allow better handling, and narrow notes to be resized (which is nice for dragging.)
+
 static constexpr float HANDLE_WIDTH = 8.0f;
 
 std::optional<NoteHit> piano_roll_hit_test(const Song& song, const Panel& panel, float mx, float my) {
@@ -248,7 +249,7 @@ Tick piano_roll_x_to_tick(const Song& song, const Panel& panel, float mx, Tick s
     float beat = (mx - PIANO_STRIP_WIDTH + cam.scroll_x) / cam.pixels_per_beat;
     Tick raw = (Tick)(beat * song.ppq);
     if (raw < 0) raw = 0;
-    return (snap_ticks > 0) ? (raw / snap_ticks) * snap_ticks : raw;
+    return snap_to_nearest(raw, snap_ticks);
 }
 
 int piano_roll_y_to_pitch(const Panel& panel, float my) {
@@ -266,8 +267,7 @@ std::optional<Note> piano_roll_make_note(const Song& song, const Panel& panel,
     if (pitch < 0 || pitch > 127) return std::nullopt;
     float beat    = (mx - PIANO_STRIP_WIDTH + cam.scroll_x) / cam.pixels_per_beat;
     Tick raw_tick = (Tick)(beat * song.ppq);
-    Tick snapped  = (snap_ticks > 0) ? (raw_tick / snap_ticks) * snap_ticks : raw_tick;
-    return Note{ snapped, dur_ticks, pitch, velocity, 0 };
+    return Note{ snap_to_nearest(raw_tick, snap_ticks), dur_ticks, pitch, velocity, 0 };
 }
 
 // --- public entry point ---

@@ -133,10 +133,51 @@ static void draw_notes(NVGcontext* nvg, const Song& song, const Camera& cam,
     }
 }
 
-/*
-    DR: This works fine, low noise... however — and this is just a thought — maybe the piano strip should be _constructed_ using sprites? tiles? texture smaples? Not only that might be easier to tune an cheaper (I don't know that) but people _love_ to edit skins, don't they? lmao
-*/
+
+staic void draw_octave(NVGcontext* nvg, float width, float height, uint16_fast_t on_keys = 0b000000000000){
+    float pitch_width = 1/12; // how _thick_ a key bar is
+    float white_width = 1/7;  // thickness of a white key
+    int white_map[7] = {0, 2, 4, 5, 7, 9, 11};
+    int black_map[5] = {1, 3, 6, 8, 10};
+    float black_position_map[5] =
+    {
+        pitch_width*0.5,
+        pitch_width*2.5,
+        pitch_width*5.5,
+        pitch_width*7.5,
+        pitch_width*9.5
+    };
+    
+    // Draw white keys:
+    for( int i = 0; i < 7; i++) {
+        nvgBeginPath(nvg);
+        nvgRect(nvg, 0.0f, 0.0f, white_width, width);
+        if(on_keys & (1 << white_map[i])) nvgFillColor(nvg, nvgRGBf(0.643f, 0.990f, 0.938f)); // blueish tint for held whites 
+        else nvgFillColor(nvg, nvgRGBf(0.96f, 0.95f, 0.93f)); // Ivory white keys
+        nvgFill(nvg);
+    }
+
+    // Draw black keys:
+    for( int i = 0; i < 5; i++) {
+        nvgBeginPath(nvg);
+        nvgRect(nvg, 0.0f, 0.0f, pitch_width, width);
+        if(on_keys & (1 << black_map[i])) nvgFillColor(nvg, nvgRGBf(0.0415f, 0.830f, 0.712f)); // blueish tint for held blacks
+        else nvgFillColor(nvg, nvgRGBf(0.10f, 0.09f, 0.09f)); // Ebony black keys
+        nvgFill(nvg);
+    }
+    
+    // E/F separator
+    nvgBeginPath(nvg);
+    nvgMoveTo(nvg, PIANO_STRIP_WIDTH, 0.0f);
+    nvgLineTo(nvg, PIANO_STRIP_WIDTH, (float)view_height);
+    nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.5f));
+    nvgStrokeWidth(nvg, 2.0f);
+    nvgStroke(nvg);
+}
+
+// We'll replace this with a more appropriate piano drawing tool
 static void draw_piano_strip(NVGcontext* nvg, const Camera& cam, int view_height) {
+    // 
     // Background
     nvgBeginPath(nvg);
     nvgRect(nvg, 0.0f, 0.0f, PIANO_STRIP_WIDTH, (float)view_height);

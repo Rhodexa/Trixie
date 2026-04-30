@@ -16,6 +16,7 @@ struct Track {
 };
 
 struct Song {
-    int                ppq = 480; // ticks per quarter note, taken from the MIDI file
+    int                ppq = 480;   // ticks per quarter note, taken from the MIDI file
+    float              bpm = 120.0f; // tempo; loader sets this when a tempo event is found
     std::vector<Track> tracks;
 };

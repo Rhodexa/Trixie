@@ -16,6 +16,9 @@ void draw_piano_roll(NVGcontext* nvg, const Song& song, const Panel& panel);
 // Draws a single note as a translucent white ghost overlay (in-flight drag preview).
 void piano_roll_draw_ghost(NVGcontext* nvg, const Song& song, const Panel& panel, const Note& note);
 
+// Draws the playback cursor line at the given tick position.
+void piano_roll_draw_cursor(NVGcontext* nvg, const Song& song, const Panel& panel, Tick cursor_tick);
+
 // --- hit testing ---
 
 struct NoteHit { int track; int note_idx; };

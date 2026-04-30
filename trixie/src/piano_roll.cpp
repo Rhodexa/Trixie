@@ -30,12 +30,13 @@ bool SCALE_LUT[12] = {
 // Per-track note colors. Cycles if there are more tracks than entries.
 // Slightly translucent (alpha < 1) so stacked notes stay visible.
 static constexpr float TRACK_COLORS[][4] = {
-    { 1.000f, 0.839f, 0.584f, 0.92f }, // #FFD18C — warm gold, boosted
-    { 0.671f, 0.800f, 0.620f, 0.92f }, // #A1C495 — sage green, boosted
-    { 0.608f, 0.800f, 0.882f, 0.92f }, // muted sky
+    { 1.000f, 0.839f, 0.584f, 0.92f }, // #FFD18C — warm gold
+    { 0.671f, 0.800f, 0.620f, 0.92f }, // #A1C495 — sage green
+    { 0.608f, 0.800f, 0.882f, 0.92f }, // rgba(0.6, 0.8, 0.88, 0.92) muted sky
     { 0.867f, 0.659f, 0.482f, 0.92f }, // muted terracotta
     { 0.780f, 0.722f, 0.878f, 0.92f }, // soft lavender
 };
+
 static constexpr int TRACK_COLOR_COUNT = 5;
 
 // --- coordinate helpers ---
@@ -188,6 +189,21 @@ void piano_roll_draw_ghost(NVGcontext* nvg, const Song& song, const Panel& panel
     nvgFillColor(nvg,   nvgRGBAf(1.0f, 1.0f, 1.0f, 0.22f));
     nvgFill(nvg);
     nvgStrokeColor(nvg, nvgRGBAf(1.0f, 1.0f, 1.0f, 0.75f));
+    nvgStrokeWidth(nvg, 1.5f);
+    nvgStroke(nvg);
+}
+
+// --- playback cursor ---
+
+void piano_roll_draw_cursor(NVGcontext* nvg, const Song& song, const Panel& panel, Tick cursor_tick) {
+    const Camera& cam = panel.camera;
+    float x = beat_to_x((float)cursor_tick / song.ppq, cam);
+    if (x < PIANO_STRIP_WIDTH || x > panel.w) return;
+
+    nvgBeginPath(nvg);
+    nvgMoveTo(nvg, x, 0.0f);
+    nvgLineTo(nvg, x, panel.h);
+    nvgStrokeColor(nvg, nvgRGBAf(1.0f, 0.78f, 0.18f, 0.9f)); // warm amber
     nvgStrokeWidth(nvg, 1.5f);
     nvgStroke(nvg);
 }

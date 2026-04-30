@@ -20,7 +20,8 @@
 #include <optional>
 #include <cstdio>
 
-void render_thread_run(Window& window, std::atomic<bool>& running, Song& song, InputQueue& input_queue) {
+void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
+                       InputQueue& input_queue, PlaybackEngine& engine) {
     glfwMakeContextCurrent(window.handle);
 
     if (!gladLoadGL(glfwGetProcAddress)) {
@@ -95,7 +96,6 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song, I
                                 }
                             }
                         } else {
-                            // LMB released — commit whatever was in flight
                             if (lmb_placing && pending_note)
                                 journal.commit(std::make_unique<AddNoteCommand>(song, 0, *pending_note, "Add note"));
                             lmb_placing  = false;
@@ -105,7 +105,6 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song, I
                     } else if (e.button == GLFW_MOUSE_BUTTON_RIGHT) {
                         rmb_held = e.pressed;
                         if (e.pressed) {
-                            // Wipe the note under the cursor immediately on press too
                             auto hit = piano_roll_hit_test(song, piano_roll_panel, e.x, e.y);
                             if (hit)
                                 journal.commit(std::make_unique<RemoveNoteCommand>(song, hit->track, hit->note_idx, "Remove note"));
@@ -120,7 +119,7 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song, I
                     if (lmb_placing) {
                         auto note = piano_roll_make_note(song, piano_roll_panel,
                                                          e.x, e.y, snap_ticks, snap_ticks, 100);
-                        if (note) pending_note = note; // freeze at last valid pos if over strip
+                        if (note) pending_note = note;
                     }
                     if (rmb_held) {
                         auto hit = piano_roll_hit_test(song, piano_roll_panel, e.x, e.y);
@@ -134,6 +133,8 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song, I
                         bool shft = e.mods & INPUT_MOD_SHIFT;
                         if (ctrl && e.key == GLFW_KEY_Z)
                             shft ? journal.redo() : journal.undo();
+                        else if (e.key == GLFW_KEY_SPACE)
+                            engine.toggle();
                     }
                 }
             }, event);
@@ -147,6 +148,8 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song, I
         draw_piano_roll(nvg, song, piano_roll_panel);
         if (lmb_placing && pending_note)
             piano_roll_draw_ghost(nvg, song, piano_roll_panel, *pending_note);
+        if (engine.is_playing())
+            piano_roll_draw_cursor(nvg, song, piano_roll_panel, engine.cursor_tick());
         nvgEndFrame(nvg);
 
         glfwSwapBuffers(window.handle);

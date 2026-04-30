@@ -55,6 +55,8 @@ add_executable(trixie
     src/midi_loader.cpp
     src/piano_roll.cpp
     src/input_queue.cpp
+    src/playback_engine.cpp
+    src/midi_out_plugin.cpp
 )
 
 target_include_directories(trixie PRIVATE src)
@@ -68,4 +70,5 @@ target_link_libraries(trixie PRIVATE
     OpenGL::GL
     nanovg
     midifile
+    winmm  # Windows MIDI output (MidiOutPlugin)
 )

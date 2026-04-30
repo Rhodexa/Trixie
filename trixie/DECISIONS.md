@@ -112,17 +112,24 @@ there is layout or non-musical state worth persisting alongside the notes.
 
 ### Mouse actions on the piano roll canvas
 
-| Input | Action |
-|---|---|
-| LMB (empty cell) | Place note at snapped position using current note properties |
-| LMB (over note) | Copy that note's properties (pitch, duration, velocity, pan) — next placement pastes a note with those same properties |
-| RMB (over note) | Delete note |
-| RMB + drag | "Vaporization beam" — continuously deletes notes while dragging |
-| Drag note body | Displace note (moves pitch + time together) |
-| Drag note tail | Stretch duration, snapped to grid |
-| Alt + drag note tail | Stretch duration in raw ticks (no snap) |
-| Drag bounding box tail (multi-select) | Stretch all selected notes together |
-| Shift + drag bounding box tail | Stretch in integer multiples only |
+> Director Note addition:
+Note in our convention a note's interactive rect (or as i like to call it: the container) has:
+([head][ body ][tail]) which are technically different handles with different purposes.
+A note's duration is its body length from head to tail. Effectively, dragging the body moves the note around. Draggin the _tail_ changes the note's "end tick", and dragging its head changes its "start tick". Hopefully this isn't a bad convetion, and I'm open to critique. — As a note for the future UX tweaks: heads and tails may invisibly _extend_ beyond the note's body a few pixels so grabbing them is easier.
+
+
+| Status | Input | Action |
+|---|---|---|
+|✅| LMB (empty cell) | Place note at snapped position using current note properties |
+| | LMB drag + Shift (while placing) | Stretches the in-flight note from its tail — drag right = longer, drag left = shorter, still snapped to grid |
+|?| LMB (over note) | Copy that note's properties (pitch, duration, velocity, pan) — next placement pastes a note with those same properties |
+|✅| RMB (over note) | Delete note |
+|✅| RMB + drag | "Vaporization beam" — continuously deletes notes while dragging |
+| | Drag note body | Displace note (moves pitch + time together) |
+|?| Drag note tail | Stretch duration, snapped to grid |
+|?| Alt + drag note tail | Stretch duration in raw ticks (no snap) |
+| | Drag bounding box tail (multi-select) | Stretch all selected notes together |
+| | Shift + drag bounding box tail | Stretch in integer multiples only |
 
 ### Snap options (not yet implemented)
 Common values: 1/3, 1/4, 1/8, 1/16, none.

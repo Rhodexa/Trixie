@@ -8,6 +8,8 @@
 #include "render.h"
 #include "midi_loader.h"
 #include "input_queue.h"
+#include "midi_out_plugin.h"
+#include "playback_engine.h"
 
 #include <atomic>
 #include <thread>
@@ -85,6 +87,9 @@ int main(int argc, char* argv[]) {
         h->queue->push(KeyEvent{ key, action, mods });
     });
 
+    MidiOutPlugin    midi_out;
+    PlaybackEngine   engine(song, midi_out);
+
     std::atomic<bool> running{true};
 
     window_release_context();
@@ -92,12 +97,14 @@ int main(int argc, char* argv[]) {
                               std::ref(window),
                               std::ref(running),
                               std::ref(song),
-                              std::ref(input_queue));
+                              std::ref(input_queue),
+                              std::ref(engine));
 
     while (!glfwWindowShouldClose(window.handle)) {
         glfwWaitEvents();
     }
 
+    engine.stop();
     running.store(false);
     render_thread.join();
 

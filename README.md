@@ -1,4 +1,4 @@
-# Trixie
+# Trixie DAW
 
 A digital audio workstation built from scratch. Not a fork. Built with absolute love, from us, to you
 

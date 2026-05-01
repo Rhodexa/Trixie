@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(cmake --build build)",
-      "Bash(cmake --build build --config Debug)"
+      "Bash(cmake --build build --config Debug)",
+      "WebSearch",
+      "Bash(cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug)"
     ]
   }
 }

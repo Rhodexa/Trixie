@@ -1,36 +1,45 @@
 // piano_roll.h
-// Piano roll widget: lane backgrounds, grid lines, notes, piano strip.
-// All public functions work in canvas-local coordinates (strip already excluded).
+// Piano Roll editor: SpaceType registration, layout, draw callbacks, and coordinate utilities.
+// Naming mirrors Blender: piano_roll_<region>_draw / handle_event.
 
 #pragma once
 
+#include "editor.h"
+#include "piano_roll_space.h"
 #include "song.h"
-#include "piano_roll_view.h"
 #include <optional>
 
 struct NVGcontext;
 
-void draw_piano_roll(NVGcontext* nvg, const Song& song, const PianoRollView& view);
+// --- region sizes (mirrors Blender's HEADERY etc.) ---
+constexpr float PIANO_ROLL_HEADER_H    = 32.0f;
+constexpr float PIANO_ROLL_TIMERULER_H = 24.0f;
+constexpr float PIANO_ROLL_UI_H        = 80.0f;
+constexpr float PIANO_ROLL_SCROLLBAR_W = 12.0f;
+constexpr int   PIANO_ROLL_REGION_COUNT = 6;
 
-void piano_roll_draw_ghost(NVGcontext* nvg, const Song& song,
-                           const PianoRollView& view, const Note& note);
+// --- SpaceType registration ---
+// Returns the static descriptor for the Piano Roll editor. Call once at startup.
+SpaceType* piano_roll_space_type();
 
-void piano_roll_draw_cursor(NVGcontext* nvg, const Song& song,
-                            const PianoRollView& view, Tick cursor_tick);
+// --- layout ---
+// Fills regions[PIANO_ROLL_REGION_COUNT] with winrct boxes carved from `screen`.
+// Indexed by (int)RegionType: 0=Header, 1=TimeRuler, 2=Channels, 3=Window, 4=UI, 5=Scrollbar.
+void piano_roll_compute_layout(const SpacePianoRoll& space,
+                                Box screen,
+                                ARegion regions[PIANO_ROLL_REGION_COUNT]);
 
-// --- hit testing and coordinate inversion ---
-// cx, cy are canvas-local (origin at strip right edge, view top-left).
+// --- overlay draws (called from render.cpp after the region draw loop) ---
+void piano_roll_draw_ghost(NVGcontext*, ARegion& window, const SpacePianoRoll&,
+                            const Song&, const Note&);
+void piano_roll_draw_cursor(NVGcontext*, ARegion& window, const SpacePianoRoll&,
+                             const Song&, Tick cursor_tick);
 
-std::optional<NoteHit> piano_roll_hit_test(const Song& song,
-                                           const PianoRollView& view,
-                                           float cx, float cy);
-
-std::optional<Note> piano_roll_make_note(const Song& song,
-                                         const PianoRollView& view,
-                                         float cx, float cy,
-                                         Tick snap_ticks, Tick dur_ticks, int velocity);
-
-Tick piano_roll_x_to_tick(const Song& song, const PianoRollView& view,
-                           float cx, Tick snap_ticks);
-
-int  piano_roll_y_to_pitch(const PianoRollView& view, float cy);
+// --- coordinate utilities (canvas-local coords; cx/cy relative to Window region origin) ---
+std::optional<NoteHit> piano_roll_hit_test(const Song&, const SpacePianoRoll&,
+                                            float cx, float cy);
+std::optional<Note>    piano_roll_make_note(const Song&, const SpacePianoRoll&,
+                                             float cx, float cy,
+                                             Tick snap_ticks, Tick dur_ticks, int velocity);
+Tick piano_roll_x_to_tick(const Song&, const SpacePianoRoll&, float cx, Tick snap_ticks);
+int  piano_roll_y_to_pitch(const SpacePianoRoll&, float cy);

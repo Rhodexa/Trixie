@@ -1,7 +1,8 @@
 // piano_roll.cpp
 // Renders the piano roll: lane backgrounds, grid lines, notes, piano strip.
-// Drawing order matters: lanes first, grid on top, notes on top of that,
-// piano strip last so it always sits over the scroll content.
+// All internal draw helpers work in their own local coordinate space.
+// draw_piano_roll sets up sub-boxes (strip / canvas) and applies scissor+translate
+// so each helper is completely unaware of where it sits on screen.
 
 #include "piano_roll.h"
 #include "nanovg.h"
@@ -10,69 +11,58 @@
 #include <algorithm>
 #include <cstdint>
 
-static constexpr float PIANO_STRIP_WIDTH = 68.0f;
-
-
-// true means this note is "not used"
-bool SCALE_LUT[12] = {
+// true = note is not in scale (draw darker lane)
+static bool SCALE_LUT[12] = {
     false, true,  false, true,  false,
     false, true,  false, true,  false, true, false
 };
 
-// Per-track note colors. Cycles if there are more tracks than entries.
-// Slightly translucent (alpha < 1) so stacked notes stay visible.
 static constexpr float TRACK_COLORS[][4] = {
-    { 1.000f, 0.839f, 0.584f, 0.92f }, // #FFD18C — warm gold
-    { 0.671f, 0.800f, 0.620f, 0.92f }, // #A1C495 — sage green
-    { 0.608f, 0.800f, 0.882f, 0.92f }, // rgba(0.6, 0.8, 0.88, 0.92) muted sky
+    { 1.000f, 0.839f, 0.584f, 0.92f }, // warm gold
+    { 0.671f, 0.800f, 0.620f, 0.92f }, // sage green
+    { 0.608f, 0.800f, 0.882f, 0.92f }, // muted sky
     { 0.867f, 0.659f, 0.482f, 0.92f }, // muted terracotta
     { 0.780f, 0.722f, 0.878f, 0.92f }, // soft lavender
 };
+static constexpr int TRACK_COLOR_COUNT = (int)(sizeof(TRACK_COLORS) / sizeof(TRACK_COLORS[0]));
 
-static constexpr int TRACK_COLOR_COUNT = 5;
-
-// --- coordinate helpers ---
+// --- coordinate helpers (canvas-local) ---
+// Camera world units: x = beats, y = semitones.
+// screen = world * zoom - scroll
 
 static float beat_to_x(float beat, const Camera& cam) {
-    return PIANO_STRIP_WIDTH + beat * cam.pixels_per_beat - cam.scroll_x;
+    return beat * cam.zoom_x - cam.scroll_x;
 }
 
 static float pitch_to_y(int pitch, const Camera& cam) {
-    return (127 - pitch) * cam.lane_height - cam.scroll_y;
+    return (127 - pitch) * cam.zoom_y - cam.scroll_y;
 }
 
-// --- drawing passes ---
+// --- canvas draw passes ---
+// All helpers receive canvas dimensions (no strip offset) and draw at local origin.
 
-// Technically, the piano roll itself is a "div".
-// DR(Director's note lol): If i'm not mistaken, it technically has its own "viewport"
-// the keyboard strip maintains its width, however, its vertical scale matches the vertical scale of the camera's vertical zoom
-// You can pan across the lanes, but the piano shoudln't move. This means PIANO_STRIP_WIDTH has nothing to do here from now own, other than setting up a new viewport space _offset_ by that amount
 static void draw_pitch_lanes(NVGcontext* nvg, const Camera& cam,
-                              int view_width, int view_height) {
-    int first_pitch = 127 - (int)floorf(cam.scroll_y / cam.lane_height);
-    int last_pitch  = 127 - (int)floorf((cam.scroll_y + view_height) / cam.lane_height) - 1;
+                              int canvas_w, int canvas_h) {
+    int first_pitch = 127 - (int)floorf(cam.scroll_y / cam.zoom_y);
+    int last_pitch  = 127 - (int)floorf((cam.scroll_y + (float)canvas_h) / cam.zoom_y) - 1;
     first_pitch = std::min(first_pitch, 127);
     last_pitch  = std::max(last_pitch,  0);
 
     for (int pitch = last_pitch; pitch <= first_pitch; pitch++) {
         float y = pitch_to_y(pitch, cam);
-        bool  black = SCALE_LUT[pitch % 12]; // here it is
-
         nvgBeginPath(nvg);
-        nvgRect(nvg, PIANO_STRIP_WIDTH, y,
-                (float)view_width - PIANO_STRIP_WIDTH, cam.lane_height);
-        nvgFillColor(nvg, black
-            ? nvgRGBf(0.055f, 0.063f, 0.080f)  // black key: noticeably darker
-            : nvgRGBf(0.082f, 0.094f, 0.122f)); // white key: #15181f
+        nvgRect(nvg, 0.0f, y, (float)canvas_w, cam.zoom_y);
+        nvgFillColor(nvg, SCALE_LUT[pitch % 12]
+            ? nvgRGBf(0.055f, 0.063f, 0.080f)
+            : nvgRGBf(0.082f, 0.094f, 0.122f));
         nvgFill(nvg);
     }
 }
 
 static void draw_grid_lines(NVGcontext* nvg, const Camera& cam,
-                             int view_width, int view_height) {
-    float roll_width    = (float)view_width - PIANO_STRIP_WIDTH; // DR: same roll viewport note thing
-    float first_beat    = cam.scroll_x / cam.pixels_per_beat;
-    float last_beat     = (cam.scroll_x + roll_width) / cam.pixels_per_beat;
+                             int canvas_w, int canvas_h) {
+    float first_beat = cam.scroll_x / cam.zoom_x;
+    float last_beat  = (cam.scroll_x + (float)canvas_w) / cam.zoom_x;
 
     for (float beat = floorf(first_beat); beat <= last_beat; beat += 1.0f) {
         float x      = beat_to_x(beat, cam);
@@ -80,7 +70,7 @@ static void draw_grid_lines(NVGcontext* nvg, const Camera& cam,
 
         nvgBeginPath(nvg);
         nvgMoveTo(nvg, x, 0.0f);
-        nvgLineTo(nvg, x, (float)view_height);
+        nvgLineTo(nvg, x, (float)canvas_h);
         nvgStrokeColor(nvg, is_bar
             ? nvgRGBAf(0.0f, 0.0f, 0.0f, 0.35f)
             : nvgRGBAf(0.0f, 0.0f, 0.0f, 0.15f));
@@ -90,7 +80,7 @@ static void draw_grid_lines(NVGcontext* nvg, const Camera& cam,
 }
 
 static void draw_notes(NVGcontext* nvg, const Song& song, const Camera& cam,
-                        int view_width, int view_height) {
+                        int canvas_w, int canvas_h) {
     for (int t = 0; t < (int)song.tracks.size(); t++) {
         const float* c = TRACK_COLORS[t % TRACK_COLOR_COUNT];
 
@@ -100,14 +90,13 @@ static void draw_notes(NVGcontext* nvg, const Song& song, const Camera& cam,
 
             float x = beat_to_x(beats_start, cam);
             float y = pitch_to_y(note.pitch, cam);
-            float w = std::max(beats_dur * cam.pixels_per_beat, 2.0f); // min 2px
-            float h = cam.lane_height;
+            float w = std::max(beats_dur * cam.zoom_x, 2.0f);
+            float h = cam.zoom_y;
 
-            // Skip notes entirely outside the viewport
-            if (x + w < PIANO_STRIP_WIDTH) continue;
-            if (x     > (float)view_width)  continue;
-            if (y + h < 0.0f)               continue;
-            if (y     > (float)view_height)  continue;
+            if (x + w < 0.0f)           continue;
+            if (x     > (float)canvas_w) continue;
+            if (y + h < 0.0f)           continue;
+            if (y     > (float)canvas_h) continue;
 
             float inset  = 1.5f;
             float nw     = std::max(w - inset * 2.0f, 1.0f);
@@ -125,10 +114,8 @@ static void draw_notes(NVGcontext* nvg, const Song& song, const Camera& cam,
     }
 }
 
+// --- piano strip ---
 
-// Normalized geometry for one piano octave, authored C-on-top (y=0 = top of C key).
-// Positions are in [0,1] relative to octave height. Black keys overlap adjacent whites,
-// matching real piano geometry. 7 white keys × h=0.143 ≈ 1.0 (fills the octave).
 struct KeyDef { float y, h; bool black; };
 
 static constexpr KeyDef KEY_DEFS[12] = {
@@ -146,96 +133,110 @@ static constexpr KeyDef KEY_DEFS[12] = {
     { 0.857f, 0.143f, false }, // B
 };
 
-// Draws one octave of keys into a [0,width] × [0,height] local region.
-// The call site provides a y-flip transform so C lands at the band's bottom,
+// Draws one octave into [0,width] × [0,height] local space.
+// Caller applies a y-flip transform so C lands at band bottom,
 // matching the piano roll's pitch ordering (high pitch = low y).
-// on_keys: bitmask, bit 0 = C, bit 11 = B.
 static void draw_octave(NVGcontext* nvg, float width, float height, uint16_t on_keys = 0) {
-    // White keys first (background layer)
     for (int i = 0; i < 12; i++) {
         const KeyDef& k = KEY_DEFS[i];
         if (k.black) continue;
         nvgBeginPath(nvg);
-            nvgRect(nvg, 0.0f, k.y * height, width, k.h * height);
-            if      (on_keys & (1 << i))    nvgFillColor(nvg, nvgRGBf(0.0f, 0.737f, 0.859f)); // held
-            else if ((i == 0) || (i == 5))  nvgFillColor(nvg, nvgRGBf(0.85f,  0.85f,  0.85f )); // C: slightly darker
-            else                            nvgFillColor(nvg, nvgRGBf(0.96f,  0.95f,  0.93f )); 
-
-            nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.3f));
-            nvgStrokeWidth(nvg, 1.0f);
-            nvgStroke(nvg);
+        nvgRect(nvg, 0.0f, k.y * height, width, k.h * height);
+        if      (on_keys & (1 << i)) nvgFillColor(nvg, nvgRGBf(0.0f,  0.737f, 0.859f));
+        else if (i == 0 || i == 5)   nvgFillColor(nvg, nvgRGBf(0.85f, 0.85f,  0.85f ));
+        else                         nvgFillColor(nvg, nvgRGBf(0.96f, 0.95f,  0.93f ));
         nvgFill(nvg);
+        nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.1f));
+        nvgStrokeWidth(nvg, 1.0f);
+        nvgStroke(nvg);
     }
-
-    // Black keys on top
     for (int i = 0; i < 12; i++) {
         const KeyDef& k = KEY_DEFS[i];
         if (!k.black) continue;
         nvgBeginPath(nvg);
-            nvgRect(nvg, 0.0f, k.y * height, width * 0.66f, k.h * height);
-            if (on_keys & (1 << i)) nvgFillColor(nvg, nvgRGBf(0.0f, 0.737f, 0.859f)); // held
-            else                    nvgFillColor(nvg, nvgRGBf(0.10f,   0.09f,  0.09f )); // ebony
+        nvgRect(nvg, 0.0f, k.y * height, width * 0.66f, k.h * height);
+        if (on_keys & (1 << i)) nvgFillColor(nvg, nvgRGBf(0.0f,  0.737f, 0.859f));
+        else                    nvgFillColor(nvg, nvgRGBf(0.10f, 0.09f,  0.09f ));
         nvgFill(nvg);
     }
 }
 
-static void draw_piano_strip(NVGcontext* nvg, const Camera& cam, int view_height) {
-    float w = PIANO_STRIP_WIDTH;
-
-    // Ivory base — fills gaps at extremes of the MIDI range
-    nvgBeginPath(nvg);
-    nvgRect(nvg, 0.0f, 0.0f, w, (float)view_height);
-    nvgFillColor(nvg, nvgRGBf(0.96f, 0.95f, 0.93f));
-    nvgFill(nvg);
-
-    // One draw_octave call per visible octave.
-    // Within each band: B (highest pitch) sits at the TOP, C at the BOTTOM.
-    // KEY_DEFS is C-on-top, so we translate to y_bottom then flip y before drawing.
+// Draws the piano strip into the current local coordinate space (origin = strip top-left).
+// strip_w = strip_width, strip_h = view height.
+static void draw_piano_strip(NVGcontext* nvg, const Camera& cam,
+                              float strip_w, float strip_h) {
     for (int oct = 0; oct <= 10; oct++) {
         int   pitch_lo = oct * 12;
         int   pitch_hi = std::min(pitch_lo + 11, 127);
-        float y_top    = (127 - pitch_hi) * cam.lane_height - cam.scroll_y;
-        float y_bottom = (127 - pitch_lo) * cam.lane_height + cam.lane_height - cam.scroll_y;
-        float band_h   = y_bottom - y_top;
+        float y_bottom = (127 - pitch_lo) * cam.zoom_y + cam.zoom_y - cam.scroll_y;
+        float band_h   = (float)(pitch_hi - pitch_lo + 1) * cam.zoom_y;
+        float y_top    = y_bottom - band_h;
 
-        if (y_bottom < 0.0f || y_top > (float)view_height) continue;
+        if (y_bottom < 0.0f || y_top > strip_h) continue;
 
         nvgSave(nvg);
-        nvgTranslate(nvg, 0.0f, y_bottom); // origin at bottom of band
-        nvgScale(nvg, 1.0f, -1.0f);        // C (y=0) → bottom, B (y≈0.857) → top
-        draw_octave(nvg, w, band_h, 0);
+        nvgTranslate(nvg, 0.0f, y_bottom);
+        nvgScale(nvg, 1.0f, -1.0f);
+        draw_octave(nvg, strip_w, band_h, 0);
         nvgRestore(nvg);
     }
 
     // Right-edge separator
     nvgBeginPath(nvg);
-    nvgMoveTo(nvg, w, 0.0f);
-    nvgLineTo(nvg, w, (float)view_height);
+    nvgMoveTo(nvg, strip_w, 0.0f);
+    nvgLineTo(nvg, strip_w, strip_h);
     nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 1.0f));
     nvgStrokeWidth(nvg, 1.0f);
     nvgStroke(nvg);
 }
 
-// --- ghost note overlay ---
+// --- public entry points ---
 
-void piano_roll_draw_ghost(NVGcontext* nvg, const Song& song, const Panel& panel, const Note& note) {
-    const Camera& cam    = panel.camera;
-    float beats_start    = (float)note.start    / (float)song.ppq;
-    float beats_dur      = (float)note.duration / (float)song.ppq;
+void draw_piano_roll(NVGcontext* nvg, const Song& song, const PianoRollView& view) {
+    const Camera& cam = view.camera;
+    Box b             = view.box;
+
+    // Piano strip: left slice of the view
+    nvgSave(nvg);
+    nvgScissor(nvg, b.x, b.y, view.strip_width, b.h);
+    nvgTranslate(nvg, b.x, b.y);
+    draw_piano_strip(nvg, cam, view.strip_width, b.h);
+    nvgRestore(nvg);
+
+    // Canvas: everything to the right of the strip
+    float cx = b.x + view.strip_width;
+    float cw = b.w - view.strip_width;
+
+    nvgSave(nvg);
+    nvgScissor(nvg, cx, b.y, cw, b.h);
+    nvgTranslate(nvg, cx, b.y);
+    draw_pitch_lanes(nvg, cam, (int)cw, (int)b.h);
+    draw_grid_lines(nvg, cam, (int)cw, (int)b.h);
+    draw_notes(nvg, song, cam, (int)cw, (int)b.h);
+    nvgRestore(nvg);
+}
+
+void piano_roll_draw_ghost(NVGcontext* nvg, const Song& song,
+                           const PianoRollView& view, const Note& note) {
+    const Camera& cam = view.camera;
+    float beats_start = (float)note.start    / (float)song.ppq;
+    float beats_dur   = (float)note.duration / (float)song.ppq;
     float x = beat_to_x(beats_start, cam);
     float y = pitch_to_y(note.pitch,  cam);
-    float w = std::max(beats_dur * cam.pixels_per_beat, 2.0f);
-    float h = cam.lane_height;
+    float w = std::max(beats_dur * cam.zoom_x, 2.0f);
+    float h = cam.zoom_y;
 
     float inset  = 1.5f;
     float nw     = std::max(w - inset * 2.0f, 1.0f);
     float nh     = h - inset * 2.0f;
     float radius = std::min(2.0f, std::min(nw, nh) * 0.5f);
 
-    nvgSave(nvg);
-    nvgScissor(nvg, panel.x, panel.y, panel.w, panel.h);
-    nvgTranslate(nvg, panel.x, panel.y);
+    float cx = view.box.x + view.strip_width;
+    float cw = view.box.w - view.strip_width;
 
+    nvgSave(nvg);
+    nvgScissor(nvg, cx, view.box.y, cw, view.box.h);
+    nvgTranslate(nvg, cx, view.box.y);
     nvgBeginPath(nvg);
     nvgRoundedRect(nvg, x + inset, y + inset, nw, nh, radius);
     nvgFillColor(nvg,   nvgRGBAf(1.0f, 1.0f, 1.0f, 0.22f));
@@ -243,108 +244,86 @@ void piano_roll_draw_ghost(NVGcontext* nvg, const Song& song, const Panel& panel
     nvgStrokeColor(nvg, nvgRGBAf(1.0f, 1.0f, 1.0f, 0.75f));
     nvgStrokeWidth(nvg, 1.5f);
     nvgStroke(nvg);
-
     nvgRestore(nvg);
 }
 
-// --- playback cursor ---
+void piano_roll_draw_cursor(NVGcontext* nvg, const Song& song,
+                            const PianoRollView& view, Tick cursor_tick) {
+    const Camera& cam = view.camera;
+    float x = beat_to_x((float)cursor_tick / (float)song.ppq, cam);
+    float cw = view.box.w - view.strip_width;
+    if (x < 0.0f || x > cw) return;
 
-void piano_roll_draw_cursor(NVGcontext* nvg, const Song& song, const Panel& panel, Tick cursor_tick) {
-    const Camera& cam = panel.camera;
-    float x = beat_to_x((float)cursor_tick / song.ppq, cam);
-    if (x < PIANO_STRIP_WIDTH || x > panel.w) return;
+    float cx = view.box.x + view.strip_width;
 
     nvgSave(nvg);
-    nvgScissor(nvg, panel.x, panel.y, panel.w, panel.h);
-    nvgTranslate(nvg, panel.x, panel.y);
-
+    nvgScissor(nvg, cx, view.box.y, cw, view.box.h);
+    nvgTranslate(nvg, cx, view.box.y);
     nvgBeginPath(nvg);
     nvgMoveTo(nvg, x, 0.0f);
-    nvgLineTo(nvg, x, panel.h);
-    nvgStrokeColor(nvg, nvgRGBAf(1.0f, 0.78f, 0.18f, 0.9f)); // warm amber
+    nvgLineTo(nvg, x, view.box.h);
+    nvgStrokeColor(nvg, nvgRGBAf(1.0f, 0.78f, 0.18f, 0.9f));
     nvgStrokeWidth(nvg, 1.5f);
     nvgStroke(nvg);
-
     nvgRestore(nvg);
 }
 
 // --- hit testing / coordinate inversion ---
-
-// Width of the head/tail drag handles in pixels.
-// Notes narrower than 2× this are treated as body-only. DN: This is problematic, because it means tiny notes cannot be resized. I belive it makes sense to have head and tail _handles_ extend _beyond_ the body size. This would allow better handling, and narrow notes to be resized (which is nice for dragging.)
+// All public functions receive canvas-local coords (strip already excluded by caller).
 
 static constexpr float HANDLE_WIDTH = 8.0f;
 
-std::optional<NoteHit> piano_roll_hit_test(const Song& song, const Panel& panel, float mx, float my) {
-    const Camera& cam = panel.camera;
+std::optional<NoteHit> piano_roll_hit_test(const Song& song,
+                                           const PianoRollView& view,
+                                           float cx, float cy) {
+    const Camera& cam = view.camera;
     for (int t = 0; t < (int)song.tracks.size(); t++) {
         const auto& notes = song.tracks[t].notes;
         for (int i = 0; i < (int)notes.size(); i++) {
             const Note& n = notes[i];
-            float x0 = beat_to_x((float)n.start                  / song.ppq, cam);
-            float x1 = beat_to_x((float)(n.start + n.duration)   / song.ppq, cam);
+            float x0 = beat_to_x((float)n.start                / (float)song.ppq, cam);
+            float x1 = beat_to_x((float)(n.start + n.duration) / (float)song.ppq, cam);
             float y0 = pitch_to_y(n.pitch, cam);
-            float y1 = y0 + cam.lane_height;
-            if (mx < x0 || mx >= x1 || my < y0 || my >= y1) continue;
+            float y1 = y0 + cam.zoom_y;
+            if (cx < x0 || cx >= x1 || cy < y0 || cy >= y1) continue;
 
             float w = x1 - x0;
             NotePart part;
-            if (w < HANDLE_WIDTH * 2.0f) {
-                part = NotePart::BODY;
-            } else if (mx < x0 + HANDLE_WIDTH) {
-                part = NotePart::HEAD;
-            } else if (mx >= x1 - HANDLE_WIDTH) {
-                part = NotePart::TAIL;
-            } else {
-                part = NotePart::BODY;
-            }
+            if      (w < HANDLE_WIDTH * 2.0f) part = NotePart::BODY;
+            else if (cx < x0 + HANDLE_WIDTH)  part = NotePart::HEAD;
+            else if (cx >= x1 - HANDLE_WIDTH) part = NotePart::TAIL;
+            else                              part = NotePart::BODY;
+
             return NoteHit{ t, i, part };
         }
     }
     return std::nullopt;
 }
 
-Tick piano_roll_x_to_tick(const Song& song, const Panel& panel, float mx, Tick snap_ticks) {
-    const Camera& cam = panel.camera;
-    float beat = (mx - PIANO_STRIP_WIDTH + cam.scroll_x) / cam.pixels_per_beat;
-    Tick raw = (Tick)(beat * song.ppq);
+Tick piano_roll_x_to_tick(const Song& song, const PianoRollView& view,
+                           float cx, Tick snap_ticks) {
+    const Camera& cam = view.camera;
+    float beat = (cx + cam.scroll_x) / cam.zoom_x;
+    Tick raw = (Tick)(beat * (float)song.ppq);
     if (raw < 0) raw = 0;
     return snap_to_nearest(raw, snap_ticks);
 }
 
-int piano_roll_y_to_pitch(const Panel& panel, float my) {
-    const Camera& cam = panel.camera;
-    int pitch = 127 - (int)floorf((my + cam.scroll_y) / cam.lane_height);
+int piano_roll_y_to_pitch(const PianoRollView& view, float cy) {
+    const Camera& cam = view.camera;
+    int pitch = 127 - (int)floorf((cy + cam.scroll_y) / cam.zoom_y);
     return std::clamp(pitch, 0, 127);
 }
 
-std::optional<Note> piano_roll_make_note(const Song& song, const Panel& panel,
-                                         float mx, float my,
+std::optional<Note> piano_roll_make_note(const Song& song,
+                                         const PianoRollView& view,
+                                         float cx, float cy,
                                          Tick snap_ticks, Tick dur_ticks, int velocity) {
-    if (mx < PIANO_STRIP_WIDTH) return std::nullopt;
-    const Camera& cam = panel.camera;
-    int pitch = 127 - (int)floorf((my + cam.scroll_y) / cam.lane_height);
+    if (cx < 0.0f) return std::nullopt; // on the strip
+    const Camera& cam = view.camera;
+    int pitch = 127 - (int)floorf((cy + cam.scroll_y) / cam.zoom_y);
     if (pitch < 0 || pitch > 127) return std::nullopt;
-    float beat    = (mx - PIANO_STRIP_WIDTH + cam.scroll_x) / cam.pixels_per_beat;
-    Tick raw_tick = (Tick)(beat * song.ppq);
+    float beat    = (cx + cam.scroll_x) / cam.zoom_x;
+    Tick raw_tick = (Tick)(beat * (float)song.ppq);
     return Note{ snap_to_nearest(raw_tick, snap_ticks), dur_ticks, pitch, velocity, 0 };
-}
-
-// --- public entry point ---
-
-void draw_piano_roll(NVGcontext* nvg, const Song& song, const Panel& panel) {
-    int view_width  = (int)panel.w;
-    int view_height = (int)panel.h;
-    const Camera& camera = panel.camera;
-
-    nvgSave(nvg);
-    nvgScissor(nvg, panel.x, panel.y, panel.w, panel.h);
-    nvgTranslate(nvg, panel.x, panel.y);
-
-    draw_pitch_lanes(nvg, camera, view_width, view_height);
-    draw_grid_lines(nvg, camera, view_width, view_height);
-    draw_notes(nvg, song, camera, view_width, view_height);
-    draw_piano_strip(nvg, camera, view_height);
-
-    nvgRestore(nvg);
 }

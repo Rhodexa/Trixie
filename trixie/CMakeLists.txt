@@ -54,6 +54,8 @@ add_executable(trixie
     src/journal.cpp
     src/midi_loader.cpp
     src/piano_roll.cpp
+    src/piano_roll_ops.cpp
+    src/wm.cpp
     src/input_queue.cpp
     src/playback_engine.cpp
     src/midi_out_plugin.cpp

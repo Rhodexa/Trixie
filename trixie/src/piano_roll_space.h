@@ -6,7 +6,7 @@
 
 #include "camera.h"
 #include "note.h"
-#include "note_hit.h"
+#include "wm.h"
 #include <optional>
 
 struct SpacePianoRoll {
@@ -18,16 +18,9 @@ struct SpacePianoRoll {
     Tick cursor_tick = 0;
     bool is_playing  = false;
 
-    // Interaction state
-    bool                mmb_held          = false;
-    bool                rmb_held          = false;
-    bool                lmb_placing       = false;
-    std::optional<Note> pending_note;
+    // Pending note preview (written by NOTE_ADD_OT while placing, cleared on release/cancel).
+    std::optional<Note>       pending_note;
 
-    bool     lmb_dragging_note = false;
-    int      drag_track        = -1;
-    int      drag_note_idx     = -1;
-    NotePart drag_part         = NotePart::BODY;
-    Note     drag_original     = {};
-    Tick     drag_tick_offset  = 0;
+    // Active modal operator — owned by the wm dispatch loop.
+    std::optional<wmOperator> active_modal_op;
 };

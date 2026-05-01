@@ -5,6 +5,7 @@
 #pragma once
 
 #include "editor.h"
+#include "note_hit.h"
 #include "piano_roll_space.h"
 #include "song.h"
 #include <optional>

@@ -112,7 +112,7 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
         }
 
         // Overlays drawn on top of the Window region
-        if (space.lmb_placing && space.pending_note)
+        if (space.pending_note)
             piano_roll_draw_ghost(nvg, win, space, song, *space.pending_note);
         if (space.is_playing)
             piano_roll_draw_cursor(nvg, win, space, song, space.cursor_tick);

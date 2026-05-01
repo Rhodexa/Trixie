@@ -3,12 +3,10 @@
 // Internal draw helpers work in region-local coordinate space (origin = region top-left).
 
 #include "piano_roll.h"
-#include "journal.h"
-#include "note_commands.h"
+#include "piano_roll_ops.h"
 #include "toolbar.h"
 #include "nanovg.h"
 
-#include <GLFW/glfw3.h>
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
@@ -123,26 +121,26 @@ static void draw_notes(NVGcontext* nvg, const Song& song, const Camera& cam, int
 struct KeyDef { float y, h; bool black; };
 
 static constexpr KeyDef KEY_DEFS[12] = {
-    { 0.000f, 0.143f, false }, // C
-    { 0.083f, 0.082f, true  }, // C#
-    { 0.143f, 0.143f, false }, // D
-    { 0.250f, 0.082f, true  }, // D#
-    { 0.286f, 0.143f, false }, // E
-    { 0.429f, 0.143f, false }, // F
-    { 0.500f, 0.082f, true  }, // F#
-    { 0.571f, 0.143f, false }, // G
-    { 0.667f, 0.082f, true  }, // G#
-    { 0.714f, 0.143f, false }, // A
-    { 0.833f, 0.082f, true  }, // A#
-    { 0.857f, 0.143f, false }, // B
+    { 1 - 0.0000f, -0.1389f, false },      // C
+    { 1 - 0.0833f, -0.0833f, true  },      //     C#
+    { 1 - 0.1389f, -0.1389f, false },      // D
+    { 1 - 0.2500f, -0.0833f, true  },      //     D#
+    { 1 - 0.2777f, -0.1389f, false },      // E
+    { 1 - 0.4166f, -0.1458f, false },      // F
+    { 1 - 0.5000f, -0.0833f, true  },      //     F#
+    { 1 - 0.5625f, -0.1458f, false },      // G
+    { 1 - 0.6667f, -0.0833f, true  },      //     G#
+    { 1 - 0.7083f, -0.1458f, false },      // A
+    { 1 - 0.8333f, -0.0833f, true  },      //     A#
+    { 1 - 0.8542f, -0.1458f, false },      // B
 };
 
-static void draw_octave(NVGcontext* nvg, float width, float height, uint16_t on_keys = 0) {
+static void draw_octave(NVGcontext* nvg, float x, float y, float width, float height, uint16_t on_keys = 0) {
     for (int i = 0; i < 12; i++) {
         const KeyDef& k = KEY_DEFS[i];
         if (k.black) continue;
         nvgBeginPath(nvg);
-        nvgRect(nvg, 0.0f, k.y * height, width, k.h * height);
+        nvgRect(nvg, x, y + k.y * height, width, k.h * height);
         if      (on_keys & (1 << i)) nvgFillColor(nvg, nvgRGBf(0.0f,  0.737f, 0.859f));
         else if (i == 0 || i == 5)   nvgFillColor(nvg, nvgRGBf(0.85f, 0.85f,  0.85f ));
         else                         nvgFillColor(nvg, nvgRGBf(0.96f, 0.95f,  0.93f ));
@@ -155,37 +153,19 @@ static void draw_octave(NVGcontext* nvg, float width, float height, uint16_t on_
         const KeyDef& k = KEY_DEFS[i];
         if (!k.black) continue;
         nvgBeginPath(nvg);
-        nvgRect(nvg, 0.0f, k.y * height, width * 0.66f, k.h * height);
+        nvgRect(nvg, x, y + k.y * height, width * 0.66f, k.h * height);
         if (on_keys & (1 << i)) nvgFillColor(nvg, nvgRGBf(0.0f,  0.737f, 0.859f));
         else                    nvgFillColor(nvg, nvgRGBf(0.10f, 0.09f,  0.09f ));
         nvgFill(nvg);
     }
 }
 
-static void draw_piano_strip_impl(NVGcontext* nvg, const Camera& cam,
-                                   float strip_w, float strip_h) {
-    for (int oct = 0; oct <= 10; oct++) {
-        int   pitch_lo = oct * 12;
-        int   pitch_hi = std::min(pitch_lo + 11, 127);
-        float y_bottom = (127 - pitch_lo) * cam.zoom_y + cam.zoom_y - cam.scroll_y;
-        float band_h   = (float)(pitch_hi - pitch_lo + 1) * cam.zoom_y;
-        float y_top    = y_bottom - band_h;
-
-        if (y_bottom < 0.0f || y_top > strip_h) continue;
-
-        nvgSave(nvg);
-        nvgTranslate(nvg, 0.0f, y_bottom);
-        nvgScale(nvg, 1.0f, -1.0f);
-        draw_octave(nvg, strip_w, band_h, 0);
-        nvgRestore(nvg);
+static void draw_piano_strip_impl(NVGcontext* nvg, const Camera& cam, float strip_w, float strip_h) {
+    nvgSave(nvg);
+    for (int oct = 0; oct < 11; oct++) {
+        draw_octave(nvg, 0, ((128 - 12 - oct * 12) * cam.zoom_y) - cam.scroll_y, strip_w, 12.0f * cam.zoom_y, 0);
     }
-
-    nvgBeginPath(nvg);
-    nvgMoveTo(nvg, strip_w, 0.0f);
-    nvgLineTo(nvg, strip_w, strip_h);
-    nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 1.0f));
-    nvgStrokeWidth(nvg, 1.0f);
-    nvgStroke(nvg);
+    nvgRestore(nvg);
 }
 
 // ============================================================
@@ -304,8 +284,7 @@ static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region,
     nvgRestore(nvg);
 }
 
-static void piano_roll_channels_draw(NVGcontext* nvg, ARegion& region,
-                                      const SpacePianoRoll& space, const Song& /*song*/) {
+static void piano_roll_channels_draw(NVGcontext* nvg, ARegion& region, const SpacePianoRoll& space, const Song& /*song*/) {
     const Box& b = region.winrct;
     nvgSave(nvg);
     nvgScissor(nvg, b.x, b.y, b.w, b.h);
@@ -314,8 +293,7 @@ static void piano_roll_channels_draw(NVGcontext* nvg, ARegion& region,
     nvgRestore(nvg);
 }
 
-static void piano_roll_window_draw(NVGcontext* nvg, ARegion& region,
-                                    const SpacePianoRoll& space, const Song& song) {
+static void piano_roll_window_draw(NVGcontext* nvg, ARegion& region, const SpacePianoRoll& space, const Song& song) {
     const Box& b = region.winrct;
     nvgSave(nvg);
     nvgScissor(nvg, b.x, b.y, b.w, b.h);
@@ -369,160 +347,10 @@ static void piano_roll_scrollbar_draw(NVGcontext* nvg, ARegion& region,
 
 static bool piano_roll_window_handle_event(ARegion& region, SpacePianoRoll& space,
                                             Song& song, Journal& journal,
-                                            const InputEvent& event) {
-    const Box& b        = region.winrct;
-    Tick       snap_ticks = song.ppq;
-
-    return std::visit([&](auto&& e) -> bool {
-        using T = std::decay_t<decltype(e)>;
-
-        if constexpr (std::is_same_v<T, ScrollEvent>) {
-            bool ctrl  = e.mods & INPUT_MOD_CONTROL;
-            bool shift = e.mods & INPUT_MOD_SHIFT;
-
-            if (ctrl && shift) {
-                float screen_cx = e.mx - b.x;
-                float world_cx  = (screen_cx + space.camera.scroll_x) / space.camera.zoom_x;
-                float factor    = (e.dy > 0.0f) ? 1.15f : (1.0f / 1.15f);
-                space.camera.zoom_x   = std::clamp(space.camera.zoom_x * factor, 10.0f, 1000.0f);
-                space.camera.scroll_x = std::max(0.0f, world_cx * space.camera.zoom_x - screen_cx);
-            } else if (shift) {
-                float screen_cy = e.my - b.y;
-                float world_cy  = (screen_cy + space.camera.scroll_y) / space.camera.zoom_y;
-                float factor    = (e.dy > 0.0f) ? 1.15f : (1.0f / 1.15f);
-                space.camera.zoom_y   = std::clamp(space.camera.zoom_y * factor, 4.0f, 80.0f);
-                space.camera.scroll_y = std::max(0.0f, world_cy * space.camera.zoom_y - screen_cy);
-            } else if (ctrl) {
-                space.camera.scroll_x = std::max(0.0f, space.camera.scroll_x - e.dy * 60.0f);
-            } else {
-                space.camera.scroll_y = std::max(0.0f, space.camera.scroll_y - e.dy * 30.0f);
-            }
-            return true;
-
-        } else if constexpr (std::is_same_v<T, MouseButtonEvent>) {
-            float cx = e.x - b.x;
-            float cy = e.y - b.y;
-
-            if (e.button == GLFW_MOUSE_BUTTON_MIDDLE) {
-                space.mmb_held = e.pressed;
-                return true;
-
-            } else if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
-                if (e.pressed) {
-                    auto hit = piano_roll_hit_test(song, space, cx, cy);
-                    if (hit) {
-                        space.lmb_dragging_note = true;
-                        space.drag_track        = hit->track;
-                        space.drag_note_idx     = hit->note_idx;
-                        space.drag_part         = hit->part;
-                        space.drag_original     = song.tracks[hit->track].notes[hit->note_idx];
-                        Tick raw                = piano_roll_x_to_tick(song, space, cx, 0);
-                        space.drag_tick_offset  = raw - space.drag_original.start;
-                    } else if (!song.tracks.empty()) {
-                        auto note = piano_roll_make_note(song, space, cx, cy,
-                                                          snap_ticks, snap_ticks, 100);
-                        if (note) { space.pending_note = note; space.lmb_placing = true; }
-                    }
-                } else {
-                    if (space.lmb_dragging_note) {
-                        Note& cur = song.tracks[space.drag_track].notes[space.drag_note_idx];
-                        if (cur.start    != space.drag_original.start ||
-                            cur.pitch    != space.drag_original.pitch  ||
-                            cur.duration != space.drag_original.duration) {
-                            Note final_note = cur;
-                            journal.commit(std::make_unique<EditNoteCommand>(
-                                song, space.drag_track, space.drag_note_idx,
-                                space.drag_original, final_note,
-                                space.drag_part == NotePart::BODY ? "Move note" :
-                                space.drag_part == NotePart::TAIL ? "Resize note tail" :
-                                                                    "Resize note head"));
-                        }
-                        space.lmb_dragging_note = false;
-                    }
-                    if (space.lmb_placing && space.pending_note)
-                        journal.commit(std::make_unique<AddNoteCommand>(
-                            song, 0, *space.pending_note, "Add note"));
-                    space.lmb_placing  = false;
-                    space.pending_note = std::nullopt;
-                }
-                return true;
-
-            } else if (e.button == GLFW_MOUSE_BUTTON_RIGHT) {
-                space.rmb_held = e.pressed;
-                if (e.pressed && !space.lmb_dragging_note) {
-                    float cx = e.x - b.x;
-                    float cy = e.y - b.y;
-                    auto hit = piano_roll_hit_test(song, space, cx, cy);
-                    if (hit)
-                        journal.commit(std::make_unique<RemoveNoteCommand>(
-                            song, hit->track, hit->note_idx, "Remove note"));
-                }
-                return true;
-            }
-            return false;
-
-        } else if constexpr (std::is_same_v<T, MouseMoveEvent>) {
-            float cx = e.x - b.x;
-            float cy = e.y - b.y;
-
-            if (space.mmb_held) {
-                space.camera.scroll_x = std::max(0.0f, space.camera.scroll_x - e.dx);
-                space.camera.scroll_y = std::max(0.0f, space.camera.scroll_y - e.dy);
-            }
-
-            if (space.lmb_placing) {
-                auto note = piano_roll_make_note(song, space, cx, cy,
-                                                  snap_ticks, snap_ticks, 100);
-                if (note) space.pending_note = note;
-            }
-
-            if (space.lmb_dragging_note) {
-                Note& note         = song.tracks[space.drag_track].notes[space.drag_note_idx];
-                Tick  original_end = space.drag_original.start + space.drag_original.duration;
-
-                if (space.drag_part == NotePart::BODY) {
-                    Tick raw   = piano_roll_x_to_tick(song, space, cx, 0) - space.drag_tick_offset;
-                    note.start = std::max(0LL, snap_to_nearest(raw, snap_ticks));
-                    note.pitch = piano_roll_y_to_pitch(space, cy);
-
-                } else if (space.drag_part == NotePart::TAIL) {
-                    /*
-                        Rhode: ok, let me understand this logic:
-                            * raw_end is where the note's tail is in _ticks_
-                            * snapped_end would be the predicted position of the tail once snapped <- this is my current point of interest
-                                (scrapped) raw_end / snap_ticks does basically a floor. This is kind of a flaw in the logic, let me think, i believe snapping of tail should happen away from 0
-                                    Turns out rounding from the midpoint is better.
-                            * min_end makes sense: a note cannot be smaller than this, basically.
-                                Thinking about it, I think there are _two_ minimum ends:
-                                    1. this one, which is literally the smallest unit of time
-                                    2. the configured minimum.
-                                    Let me think.
-                                    So, FL Studio, for example, does not limit notes to a minimum tick, instead it has a somewhat larger limit. When a note is _that_ small it turns it into a beat (uses a different rendering style for the note, to signal it cannot be smaller)
-                                    This is useful for percussives. Perhaps, the whole start + snap_ticks is enough for now, but this should be able to be even smaller: by holding alt
-                                    So there _are_ at least two mins, just like for the tail: where you can have raw and snapped, min can be start + snapping, or start + n_ticks (when holding alt). "n_ticks" is just a placeholder, could be 1, 2, 8... idk. Emperical testing would reveal
-                    */
-                    Tick raw_end     = piano_roll_x_to_tick(song, space, cx, 0);
-                    Tick snapped_end = snap_to_nearest(raw_end, snap_ticks);
-                    note.duration    = std::max(snapped_end, note.start + snap_ticks) - note.start;
-
-                } else { // HEAD
-                    Tick snapped  = snap_to_nearest(piano_roll_x_to_tick(song, space, cx, 0), snap_ticks);
-                    note.start    = std::clamp(snapped, 0LL, original_end - snap_ticks);
-                    note.duration = original_end - note.start;
-                }
-            }
-
-            if (space.rmb_held && !space.lmb_dragging_note) {
-                auto hit = piano_roll_hit_test(song, space, cx, cy);
-                if (hit)
-                    journal.commit(std::make_unique<RemoveNoteCommand>(
-                        song, hit->track, hit->note_idx, "Remove note"));
-            }
-            return true;
-        }
-
-        return false;
-    }, event);
+                                            const InputEvent& raw) {
+    wmEvent     ev  = wm_event_from_input(raw);
+    wmOpContext ctx { region, space, song, journal };
+    return wm_handle_event(ctx, ev, piano_roll_keymap(), space.active_modal_op);
 }
 
 // ============================================================

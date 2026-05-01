@@ -9,5 +9,5 @@ struct Camera {
     float scroll_x =  0.0f;
     float scroll_y =  0.0f;
     float zoom_x   = 20.0f; // pixels per world unit (x-axis)
-    float zoom_y   = 1.0f; // pixels per world unit (y-axis)
+    float zoom_y   = 20.0f; // pixels per world unit (y-axis)
 };

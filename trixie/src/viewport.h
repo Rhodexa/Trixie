@@ -1,5 +1,8 @@
+#pragma once
+
 // Replacing current camera system with this new Viewport idea. This should handle visibility more elegantly
-// This is a quick-draft concept, and requires proper Cplusplusification. 
+// Note: This is a quick-draft concept, and requires proper Cplusplusification. 
+
 
 struct Viewport {
     float world_x, world_y;

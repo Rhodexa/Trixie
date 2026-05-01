@@ -35,6 +35,7 @@ static constexpr int TRACK_COLOR_COUNT = (int)(sizeof(TRACK_COLORS) / sizeof(TRA
 // World units: x = beats, y = semitones (0-127).
 // screen = world * zoom - scroll
 // ============================================================
+// DN: See ths is where the new viewport would come in handy.
 
 static float beat_to_x(float beat, const Camera& cam) {
     return beat * cam.zoom_x - cam.scroll_x;

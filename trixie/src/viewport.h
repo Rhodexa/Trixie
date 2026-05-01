@@ -5,12 +5,16 @@
 
 
 struct Viewport {
-    float world_x, world_y;
-    float world_w, world_h;
-    float screen_x, screen_y;
-    float screen_w, screen_h;
+    // world-space rectangle - left, top, right, bottom edges
+    float world_l, world_t;
+    float world_r, world_b;
+
+    // scree-space rectangle
+    float screen_l, screen_t;
+    float screen_r, screen_b;
 };
 
+// ToDo: update these to fit the newer left, top, right, bottom convention
 // transform world-space coordinates to screen-space coordinates. Theses put graphics in the right places on the screen
 float vp_to_screen_x(const Viewport& vp, float wx) {
     float t = (wx - vp.world_x) / vp.world_w;

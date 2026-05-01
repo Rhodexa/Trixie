@@ -155,9 +155,17 @@ static void draw_octave(NVGcontext* nvg, float x, float y, float width, float he
         if (!k.black) continue;
         nvgBeginPath(nvg);
         nvgRect(nvg, x, y + k.y * height, width * 0.66f, k.h * height);
-        if (on_keys & (1 << i)) nvgFillColor(nvg, nvgRGBf(0.0f,  0.737f, 0.859f));
-        else                    nvgFillColor(nvg, nvgRGBf(0.10f, 0.09f,  0.09f ));
+        if (on_keys & (1 << i)) {
+            nvgFillColor(nvg, nvgRGBf(0.000f, 0.737f, 0.859f));
+            nvgStrokeColor(nvg, nvgRGBf(0.000f, 0.514f, 0.592f));
+        }
+        else {
+            nvgFillColor(nvg, nvgRGBf(0.10f, 0.09f,  0.09f ));
+            nvgStrokeColor(nvg, nvgRGBf(0.302f, 0.302f, 0.302f));
+        }
+        nvgStrokeWidth(nvg, 1.0f);
         nvgFill(nvg);
+        nvgStroke(nvg);
     }
 }
 
@@ -257,14 +265,13 @@ static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region,
     float first_beat = cam.scroll_x / cam.zoom_x;
     float last_beat  = (cam.scroll_x + canvas_w) / cam.zoom_x;
 
-    nvgFontFace(nvg, "ui");
-    nvgFontSize(nvg, 10.0f);
+    nvgFontSize(nvg, 12.0f);
 
     for (float beat = floorf(first_beat); beat <= last_beat; beat += 1.0f) {
         float x      = rx + beat * cam.zoom_x - cam.scroll_x;
         bool  is_bar = ((int)beat % 4 == 0);
 
-        float tick_h = is_bar ? b.h * 0.55f : b.h * 0.28f;
+        float tick_h = is_bar ? b.h * 0.4f : b.h * 0.3f;
         nvgBeginPath(nvg);
         nvgMoveTo(nvg, x, b.h - tick_h);
         nvgLineTo(nvg, x, b.h);
@@ -276,8 +283,8 @@ static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region,
             int  bar = (int)beat / 4 + 1;
             char label[16];
             snprintf(label, sizeof(label), "%d", bar);
-            nvgTextAlign(nvg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-            nvgFillColor(nvg, nvgRGBf(0.50f, 0.56f, 0.68f));
+            nvgTextAlign(nvg, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+            nvgFillColor(nvg, nvgRGBf(0.831f, 0.886f, 1.000f));
             nvgText(nvg, x + 3.0f, 3.0f, label, nullptr);
         }
     }
@@ -388,6 +395,9 @@ void piano_roll_draw_ghost(NVGcontext* nvg, ARegion& window,
     nvgRestore(nvg);
 }
 
+/*
+    This draws two cursors:
+*/
 void piano_roll_draw_cursor(NVGcontext* nvg, ARegion& window,
                              const SpacePianoRoll& space, const Song& song, Tick cursor_tick) {
     const Box&    b   = window.winrct;
@@ -398,12 +408,30 @@ void piano_roll_draw_cursor(NVGcontext* nvg, ARegion& window,
     nvgSave(nvg);
     nvgScissor(nvg, b.x, b.y, b.w, b.h);
     nvgTranslate(nvg, b.x, b.y);
+
+    float trailLength = 10.0f;
+
+    NVGpaint gradient = nvgLinearGradient(nvg, 
+        x - trailLength, 0,
+        x, 0,
+        nvgRGBAf(1.0f, 0.78f, 0.18f, 0.0f),
+        nvgRGBAf(1.0f, 0.78f, 0.18f, 0.4f)
+    );
+
+    // 3. Draw the Trail Rectangle
+    nvgBeginPath(nvg);
+    nvgRect(nvg, x - trailLength, 0, trailLength, b.h);
+    nvgFillPaint(nvg, gradient);
+    nvgFill(nvg);
+
+    // 4. Draw vertical line
     nvgBeginPath(nvg);
     nvgMoveTo(nvg, x, 0.0f);
     nvgLineTo(nvg, x, b.h);
     nvgStrokeColor(nvg, nvgRGBAf(1.0f, 0.78f, 0.18f, 0.9f));
     nvgStrokeWidth(nvg, 1.5f);
     nvgStroke(nvg);
+
     nvgRestore(nvg);
 }
 

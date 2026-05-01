@@ -4,7 +4,9 @@
       "Bash(cmake --build build)",
       "Bash(cmake --build build --config Debug)",
       "WebSearch",
-      "Bash(cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug)"
+      "Bash(cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug)",
+      "Bash(mkdir \"C:\\\\Users\\\\Celestia\\\\Desktop\\\\Rhode\\\\vscode-nvg-color\\\\src\")",
+      "Bash(mkdir \"C:\\\\Users\\\\Celestia\\\\Desktop\\\\Rhode\\\\vscode-nvg-color\\\\.vscode\")"
     ]
   }
 }

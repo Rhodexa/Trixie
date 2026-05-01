@@ -1,4 +1,4 @@
-![screenshot](tmptlogo2.png)
+![screenshot](tmptlogo.png)
 
 # Trixie DAW v0.1.1.0252300426
 

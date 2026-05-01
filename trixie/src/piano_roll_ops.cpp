@@ -45,7 +45,9 @@ static OperatorType VIEW2D_SCROLL_X_OT = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // view2d.zoom_y  —  Shift+scroll → vertical zoom toward cursor
 // ═══════════════════════════════════════════════════════════════════════════════
-
+// ToDo: Make zoom out clamp to content.
+// Perhaps camera shouldn't be scroll+zoom but "viewport" width x, y, width and height in pixels. Like UV mapping.
+// fitting content then becomes a linear interpolation, and 100% zoom out happens when all vertices of the viewport match the bounding box of the content.
 static OpResult view2d_zoom_y_invoke(wmOperator&, wmOpContext& ctx, const wmEvent& ev) {
     const Box& b    = ctx.region.winrct;
     float screen_cy = ev.y - b.y;
@@ -312,12 +314,12 @@ static OperatorType NOTE_ERASE_OT = {
 static const wmKeyMapItem PIANO_ROLL_KEYMAP_ITEMS[] = {
     //  type                  value                mods               key  op
     // Shift → vertical zoom
-    { EventType::WheelUp,   EventValue::Nothing, INPUT_MOD_CONTROL,   0, &VIEW2D_ZOOM_Y_OT   },
-    { EventType::WheelDown, EventValue::Nothing, INPUT_MOD_CONTROL,   0, &VIEW2D_ZOOM_Y_OT   },
+    { EventType::WheelUp,   EventValue::Nothing, INPUT_MOD_CONTROL, 0, &VIEW2D_ZOOM_Y_OT   },
+    { EventType::WheelDown, EventValue::Nothing, INPUT_MOD_CONTROL, 0, &VIEW2D_ZOOM_Y_OT   },
 
     // Ctrl → horizontal zoom
-    { EventType::WheelUp,   EventValue::Nothing, INPUT_MOD_SHIFT, 0, &VIEW2D_ZOOM_X_OT   },
-    { EventType::WheelDown, EventValue::Nothing, INPUT_MOD_SHIFT, 0, &VIEW2D_ZOOM_X_OT   },
+    { EventType::WheelUp,   EventValue::Nothing, INPUT_MOD_SHIFT,   0, &VIEW2D_ZOOM_X_OT   },
+    { EventType::WheelDown, EventValue::Nothing, INPUT_MOD_SHIFT,   0, &VIEW2D_ZOOM_X_OT   },
 
     // Alt → horizontal scroll
     { EventType::WheelUp,   EventValue::Nothing, INPUT_MOD_ALT,     0, &VIEW2D_SCROLL_X_OT },

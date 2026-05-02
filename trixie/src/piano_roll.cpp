@@ -45,7 +45,7 @@ static void draw_pitch_lanes(NVGcontext* nvg, const Viewport& vp, int w, int h) 
         nvgBeginPath(nvg);
         nvgRect(nvg, 0.0f, y, (float)w, row_h);
         nvgFillColor(nvg, SCALE_LUT[pitch % 12]
-            ? nvgRGBf(0.078f, 0.090f, 0.114f)
+            ? nvgRGBf(0.090f, 0.102f, 0.125f)
             : nvgRGBf(0.102f, 0.114f, 0.145f));
         nvgFill(nvg);
     }
@@ -180,7 +180,7 @@ static void draw_octave(NVGcontext* nvg, float x, float y, float width, float he
     nvgMoveTo(nvg, x, y);
     nvgLineTo(nvg, x, y + height);
     nvgStrokeColor(nvg, nvgRGBf(0.467f, 0.114f, 0.114f));
-    nvgStrokeWidth(nvg, 4.0f);
+    nvgStrokeWidth(nvg, 6.0f);
     nvgStroke(nvg);
 }
 
@@ -249,13 +249,12 @@ void piano_roll_compute_layout(const SpacePianoRoll& space, Box screen,
 // Each: nvgSave → scissor + translate to region-local origin → draw → nvgRestore
 // ============================================================
 
-static void piano_roll_header_draw(NVGcontext* nvg, ARegion& region,
-                                    const SpacePianoRoll& space, const Song& song) {
+// ToDo: Header is a different "Editor". It leaves in the main screen context, not in the Piano Roll Editor
+static void piano_roll_header_draw(NVGcontext* nvg, ARegion& region, const SpacePianoRoll& space, const Song& song) {
     draw_toolbar(nvg, region.winrct, song, space.cursor_tick, space.is_playing);
 }
 
-static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region,
-                                       const SpacePianoRoll& space, const Song& song) {
+static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region, const SpacePianoRoll& space, const Song& song) {
     const Box&      b  = region.winrct;
     const Viewport& vp = space.viewport;
 
@@ -266,7 +265,7 @@ static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region,
     // Background
     nvgBeginPath(nvg);
     nvgRect(nvg, 0.0f, 0.0f, b.w, b.h);
-    nvgFillColor(nvg, nvgRGBf(0.055f, 0.063f, 0.080f));
+    nvgFillColor(nvg, nvgRGBf(0.157f, 0.169f, 0.200f));
     nvgFill(nvg);
 
     // Bottom separator
@@ -274,7 +273,7 @@ static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region,
     nvgMoveTo(nvg, 0.0f, b.h - 1.0f);
     nvgLineTo(nvg, b.w,  b.h - 1.0f);
     nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.6f));
-    nvgStrokeWidth(nvg, 1.0f);
+    nvgStrokeWidth(nvg, 2.0f);
     nvgStroke(nvg);
 
     // Beat markers — offset by strip_width to align with canvas x-axis.
@@ -288,23 +287,40 @@ static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region,
         float x      = rx + vp_to_screen_x(vp, beat);
         bool  is_bar = ((int)beat % 4 == 0);
 
-        float tick_h = is_bar ? b.h * 0.4f : b.h * 0.3f;
-        nvgBeginPath(nvg);
-        nvgMoveTo(nvg, x, b.h - tick_h);
-        nvgLineTo(nvg, x, b.h);
-        nvgStrokeColor(nvg, nvgRGBAf(0.5f, 0.55f, 0.65f, is_bar ? 0.7f : 0.35f));
-        nvgStrokeWidth(nvg, 1.0f);
-        nvgStroke(nvg);
-
         if (is_bar) {
             int  bar = (int)beat / 4 + 1;
             char label[16];
             snprintf(label, sizeof(label), "%d", bar);
-            nvgTextAlign(nvg, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+            nvgTextAlign(nvg, NVG_ALIGN_CENTER | NVG_ALIGN_BOTTOM);
             nvgFillColor(nvg, nvgRGBf(0.831f, 0.886f, 1.000f));
-            nvgText(nvg, x + 3.0f, 3.0f, label, nullptr);
+            nvgText(nvg, x + 3.0f, b.h-3.0f, label, nullptr);
         }
     }
+
+    NVGpaint left_cutoff = nvgLinearGradient(nvg,
+        65.0f, 0,
+        120.0f, 0,
+        nvgRGBAf(0.157f, 0.169f, 0.200f, 1.0f),
+        nvgRGBAf(0.157f, 0.169f, 0.200f, 0.0f)
+    );
+
+    nvgBeginPath(nvg);
+    nvgRect(nvg, 0.0f, 0.0f, 120.0f, b.h);
+    nvgFillPaint(nvg, left_cutoff);
+    nvgFill(nvg);
+
+
+    nvgBeginPath(nvg);
+    nvgMoveTo(nvg, 0, 0); 
+    // Curve down to the right point
+    nvgQuadTo(nvg, 150, 50, 150, 100); 
+    // Curve down to the bottom point
+    nvgQuadTo(nvg, 150, 150, 100, 200);
+    // Curve up to the left point
+    nvgQuadTo(nvg, 50, 150, 50, 100);
+    // Curve back to the start
+    nvgQuadTo(nvg, 50, 50, 100, 50);
+    nvgFill(nvg);
 
     nvgRestore(nvg);
 }

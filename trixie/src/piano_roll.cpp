@@ -265,7 +265,7 @@ static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region, const Sp
     // Background
     nvgBeginPath(nvg);
     nvgRect(nvg, 0.0f, 0.0f, b.w, b.h);
-    nvgFillColor(nvg, nvgRGBf(0.157f, 0.169f, 0.200f));
+    nvgFillColor(nvg, theme().bg_surface);
     nvgFill(nvg);
 
     // Bottom separator
@@ -292,7 +292,7 @@ static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region, const Sp
             char label[16];
             snprintf(label, sizeof(label), "%d", bar);
             nvgTextAlign(nvg, NVG_ALIGN_CENTER | NVG_ALIGN_BOTTOM);
-            nvgFillColor(nvg, nvgRGBf(0.831f, 0.886f, 1.000f));
+            nvgFillColor(nvg, theme().bg_surface_text);
             nvgText(nvg, x + 3.0f, b.h-3.0f, label, nullptr);
         }
     }
@@ -300,8 +300,8 @@ static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region, const Sp
     NVGpaint left_cutoff = nvgLinearGradient(nvg,
         65.0f, 0,
         120.0f, 0,
-        nvgRGBAf(0.157f, 0.169f, 0.200f, 1.0f),
-        nvgRGBAf(0.157f, 0.169f, 0.200f, 0.0f)
+        theme().bg_surface,
+        theme().bg_surface_transparent
     );
 
     nvgBeginPath(nvg);

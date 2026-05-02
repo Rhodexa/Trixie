@@ -6,6 +6,7 @@
 #include "box.h"
 #include "song.h"
 #include "note.h"
+#include "theme.h"
 
 struct NVGcontext;
 

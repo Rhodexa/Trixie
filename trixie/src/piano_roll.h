@@ -9,6 +9,7 @@
 #include "piano_roll_space.h"
 #include "song.h"
 #include <optional>
+#include "theme.h"
 
 struct NVGcontext;
 

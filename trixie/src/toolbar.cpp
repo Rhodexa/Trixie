@@ -13,7 +13,7 @@ void draw_toolbar(NVGcontext* nvg, Box b, const Song& song, Tick cursor_tick, bo
     // Background
     nvgBeginPath(nvg);
     nvgRect(nvg, 0.0f, 0.0f, b.w, b.h);
-    nvgFillColor(nvg, nvgRGBf(0.055f, 0.063f, 0.080f));
+    nvgFillColor(nvg, theme().bg_surface);
     nvgFill(nvg);
 
     // Bottom separator line

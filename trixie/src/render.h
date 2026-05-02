@@ -12,5 +12,4 @@
 
 // Entry point for the render thread.
 // Takes ownership of the OpenGL context on entry.
-void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
-                       InputQueue& input_queue, PlaybackEngine& engine);
+void render_thread_run(Window& window, std::atomic<bool>& running, Song& song, InputQueue& input_queue, PlaybackEngine& engine);

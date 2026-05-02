@@ -16,8 +16,8 @@ struct NVGcontext;
 // --- region sizes (mirrors Blender's HEADERY etc.) ---
 constexpr float PIANO_ROLL_HEADER_H    = 48.0f;
 constexpr float PIANO_ROLL_TIMERULER_H = 24.0f;
-constexpr float PIANO_ROLL_UI_H        = 80.0f;
-constexpr float PIANO_ROLL_SCROLLBAR_W = 12.0f;
+constexpr float PIANO_ROLL_UI_H        = 120.0f;
+constexpr float PIANO_ROLL_SCROLLBAR_W = 36.0f;
 constexpr int   PIANO_ROLL_REGION_COUNT = 6;
 
 // --- SpaceType registration ---

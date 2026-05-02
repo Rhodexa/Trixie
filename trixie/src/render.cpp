@@ -61,14 +61,16 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
         {
             const Box& wbox = regions[(int)RegionType::Window].winrct;
             if (!space.viewport_initialized) {
-                constexpr float zoom_x = 20.0f, zoom_y = 20.0f;
+                constexpr float zoom_x = 80.0f, zoom_y = 10.0f;
                 float scroll_y = std::max(0.0f, (127.0f - 60.0f) * zoom_y - wbox.h * 0.5f);
                 space.viewport = {
                     0.0f,                                      // left
-                    128.0f - scroll_y / zoom_y,                // top
+                    0.0f + scroll_y / zoom_y,                // top // note, this 0.0f + was 128.0f - before, i flipped it for debuggin reasons
                     wbox.w / zoom_x,                           // right
-                    128.0f - (scroll_y + wbox.h) / zoom_y,    // bottom
+                    0.0f + (scroll_y + wbox.h) / zoom_y,    // bottom
+
                     0.0f, 0.0f, wbox.w, wbox.h,               // screen
+                    0.0f, 0.0f, 0.0f, 128.0f                  // no left/right bounds. world bounds (this is all sooo hacked together)
                 };
                 space.viewport_initialized = true;
             } else {

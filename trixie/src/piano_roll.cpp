@@ -21,6 +21,8 @@ static bool SCALE_LUT[12] = {
     false, true,  false, true,  false, true, false
 };
 
+
+// Todo: Move these to the color library — There will be a proper channel coloring lib later on
 static constexpr float TRACK_COLORS[][4] = {
     { 1.000f, 0.839f, 0.584f, 0.92f }, // warm gold
     { 0.671f, 0.800f, 0.620f, 0.92f }, // sage green
@@ -234,8 +236,7 @@ SpaceType* piano_roll_space_type() {
 // Layout
 // ============================================================
 
-void piano_roll_compute_layout(const SpacePianoRoll& space, Box screen,
-                                ARegion regions[PIANO_ROLL_REGION_COUNT]) {
+void piano_roll_compute_layout(const SpacePianoRoll& space, Box screen, ARegion regions[PIANO_ROLL_REGION_COUNT]) {
     regions[(int)RegionType::Header]    = { RegionType::Header,    box_split_top   (&screen, PIANO_ROLL_HEADER_H),    nullptr };
     regions[(int)RegionType::TimeRuler] = { RegionType::TimeRuler, box_split_top   (&screen, PIANO_ROLL_TIMERULER_H), nullptr };
     regions[(int)RegionType::UI]        = { RegionType::UI,        box_split_bottom(&screen, PIANO_ROLL_UI_H),        nullptr };
@@ -298,29 +299,29 @@ static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region, const Sp
     }
 
     NVGpaint left_cutoff = nvgLinearGradient(nvg,
-        65.0f, 0,
-        120.0f, 0,
+        rx, 0,
+        rx + 40, 0,
         theme().bg_surface,
         theme().bg_surface_transparent
     );
 
     nvgBeginPath(nvg);
-    nvgRect(nvg, 0.0f, 0.0f, 120.0f, b.h);
+    nvgRect(nvg, 0.0f, 0.0f, rx + 40, b.h);
     nvgFillPaint(nvg, left_cutoff);
     nvgFill(nvg);
 
 
-    nvgBeginPath(nvg);
-    nvgMoveTo(nvg, 0, 0); 
-    // Curve down to the right point
-    nvgQuadTo(nvg, 150, 50, 150, 100); 
-    // Curve down to the bottom point
-    nvgQuadTo(nvg, 150, 150, 100, 200);
-    // Curve up to the left point
-    nvgQuadTo(nvg, 50, 150, 50, 100);
-    // Curve back to the start
-    nvgQuadTo(nvg, 50, 50, 100, 50);
-    nvgFill(nvg);
+    // nvgBeginPath(nvg);
+    // nvgMoveTo(nvg, 0, 0); 
+    // // Curve down to the right point
+    // nvgQuadTo(nvg, 150, 50, 150, 100); 
+    // // Curve down to the bottom point
+    // nvgQuadTo(nvg, 150, 150, 100, 200);
+    // // Curve up to the left point
+    // nvgQuadTo(nvg, 50, 150, 50, 100);
+    // // Curve back to the start
+    // nvgQuadTo(nvg, 50, 50, 100, 50);
+    // nvgFill(nvg);
 
     nvgRestore(nvg);
 }
@@ -345,8 +346,7 @@ static void piano_roll_window_draw(NVGcontext* nvg, ARegion& region, const Space
     nvgRestore(nvg);
 }
 
-static void piano_roll_ui_draw(NVGcontext* nvg, ARegion& region,
-                                const SpacePianoRoll& /*space*/, const Song& /*song*/) {
+static void piano_roll_ui_draw(NVGcontext* nvg, ARegion& region, const SpacePianoRoll& /*space*/, const Song& /*song*/) {
     const Box& b = region.winrct;
     nvgSave(nvg);
     nvgScissor(nvg, b.x, b.y, b.w, b.h);
@@ -354,13 +354,13 @@ static void piano_roll_ui_draw(NVGcontext* nvg, ARegion& region,
 
     nvgBeginPath(nvg);
     nvgRect(nvg, 0.0f, 0.0f, b.w, b.h);
-    nvgFillColor(nvg, nvgRGBf(0.048f, 0.055f, 0.072f));
+    nvgFillColor(nvg, theme().bg_surface);
     nvgFill(nvg);
 
     nvgBeginPath(nvg);
     nvgMoveTo(nvg, 0.0f, 0.5f);
     nvgLineTo(nvg, b.w,  0.5f);
-    nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.6f));
+    nvgStrokeColor(nvg, theme().surface_border);
     nvgStrokeWidth(nvg, 1.0f);
     nvgStroke(nvg);
 
@@ -386,14 +386,9 @@ static void piano_roll_scrollbar_draw(NVGcontext* nvg, ARegion& region,
 // Window region event handler
 // ============================================================
 
-static bool piano_roll_window_handle_event(ARegion& region, SpacePianoRoll& space,
-                                            Song& song, Journal& journal,
-                                            const InputEvent& raw)
-{
+static bool piano_roll_window_handle_event(ARegion& region, SpacePianoRoll& space, Song& song, Journal& journal, const InputEvent& raw) {
     if(auto* me = std::get_if<MouseMoveEvent>(&raw)) space.mouse_x = me->x - region.winrct.x;
-
-    if(auto* me = std::get_if<MouseMoveEvent>(&raw)) space.mouse_y = me->y - region.winrct.y;
-    
+    if(auto* me = std::get_if<MouseMoveEvent>(&raw)) space.mouse_y = me->y - region.winrct.y;    
     wmEvent     ev  = wm_event_from_input(raw);
     wmOpContext ctx { region, space, song, journal };
     return wm_handle_event(ctx, ev, piano_roll_keymap(), space.active_modal_op);

@@ -21,13 +21,21 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 static OpResult view2d_scroll_y_invoke(wmOperator&, wmOpContext& ctx, const wmEvent& ev) {
-    Viewport& vp    = ctx.space.viewport;
+    /*Viewport& vp    = ctx.space.viewport;
     float     zoom  = vp_zoom_y(vp);
     float     delta = ev.dy * 30.0f / zoom;
     float     range = vp.top - vp.bottom;
     float     new_t = std::min(128.0f, vp.top + delta);
     vp.top = new_t;
-    vp.bottom = new_t - range;
+    vp.bottom = new_t - range;*/
+
+    // Let's test the new viewport tools!
+    // work-in-progress. This (or rather, the viewport) should clamp itself to not go off screen
+    // This is a world property the viewport should keep in mind; how "big" the world is. "What are my bounds?"
+    Viewport& vp = ctx.space.viewport;
+    float delta = ev.dy * 30.0f; // 30px per wheel tick
+    vp_scroll_y_by(vp, delta);
+
     return OpResult::Finished;
 }
 
@@ -115,6 +123,7 @@ static OpResult view2d_pan_invoke(wmOperator& op, wmOpContext&, const wmEvent&) 
     return OpResult::Running;
 }
 
+// RN / ToDo: I believe this function can now use the viewport's new panning tools instead of coding its own?
 static OpResult view2d_pan_modal(wmOperator&, wmOpContext& ctx, const wmEvent& ev) {
     if (ev.type == EventType::MouseMove) {
         Viewport& vp      = ctx.space.viewport;

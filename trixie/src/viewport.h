@@ -1,41 +1,73 @@
 #pragma once
 
-// Replacing current camera system with this new Viewport idea. This should handle visibility more elegantly
-// Note: This is a quick-draft concept, and requires proper Cplusplusification. 
-
-
 struct Viewport {
-    // world-space rectangle - left, top, right, bottom edges
-    float world_l, world_t;
-    float world_r, world_b;
-
-    // scree-space rectangle
-    float screen_l, screen_t;
-    float screen_r, screen_b;
+    float left, top;   // world-space left/top edges
+    float right, bottom;   // world-space right/bottom edges
+    float screen_l, screen_t; // screen-space (canvas-local) left/top
+    float screen_r, screen_b; // screen-space right/bottom
 };
 
-// ToDo: update these to fit the newer left, top, right, bottom convention
-// transform world-space coordinates to screen-space coordinates. Theses put graphics in the right places on the screen
-float vp_to_screen_x(const Viewport& vp, float wx) {
-    float t = (wx - vp.world_x) / vp.world_w;
-    return vp.screen_x + t * vp.screen_w;
+// World → screen
+inline float vp_to_screen_x(const Viewport& vp, float wx) {
+    float t = (wx - vp.left) / (vp.right - vp.left);
+    return vp.screen_l + t * (vp.screen_r - vp.screen_l);
 }
 
-float vp_to_screen_y(const Viewport& vp, float wy) {
-    float t = (wy - vp.world_y) / vp.world_h;
-    return vp.screen_y + t * vp.screen_h;
+// Handles y-flip naturally: when top > bottom, higher world_y maps to lower screen_y.
+inline float vp_to_screen_y(const Viewport& vp, float wy) {
+    float t = (wy - vp.top) / (vp.bottom - vp.top);
+    return vp.screen_t + t * (vp.screen_b - vp.screen_t);
 }
 
-// These can take the screen space coordinates of the viewport itself and transform the coordinates back into world-space for things like cursor hits.
-// Note that theses are _viewport-space_ and thus cursor location still needs to take nesting into account, This is interesting because it means anythin nested views should include a viewort or a least a viewport translator.
-float vp_to_world_x(const Viewport& vp, float sx) {
-    float t = (sx - vp.screen_x) / vp.screen_w;
-    return vp.world_x + t * vp.world_w;
+// Screen → world
+inline float vp_to_world_x(const Viewport& vp, float sx) {
+    float t = (sx - vp.screen_l) / (vp.screen_r - vp.screen_l);
+    return vp.left + t * (vp.right - vp.left);
 }
 
-float vp_to_world_y(const Viewport& vp, float sy) {
-    float t = (sy - vp.screen_y) / vp.screen_h;
-    return vp.world_y + t * vp.world_h;
+inline float vp_to_world_y(const Viewport& vp, float sy) {
+    float t = (sy - vp.screen_t) / (vp.screen_b - vp.screen_t);
+    return vp.top + t * (vp.bottom - vp.top);
 }
 
+// some getters
+inline float vp_get_width(const Viewport& vp){
+    return vp.right - vp.left;
+}
 
+inline float vp_get_height(const Viewport& vp){
+    return vp.bottom - vp.top;
+}
+
+// Zoom: pixels per world unit. Positive even for y-flip (top > bottom).
+inline float vp_zoom_x(const Viewport& vp) {
+    return (vp.screen_r - vp.screen_l) / (vp.right - vp.left);
+}
+
+inline float vp_zoom_y(const Viewport& vp) {
+    return (vp.screen_b - vp.screen_t) / (vp.top - vp.bottom);
+}
+
+/*
+    Viewport controllers:
+*/
+// move viewport to a new place in X, Y
+inline void vp_go_to(Viewport& vp, float x, float y){
+    float width = vp_get_width(vp);
+    float height = vp_get_height(vp);
+    vp.left = x;
+    vp.top = y;
+    vp.right = vp.left + width;
+    vp.bottom = vp.top + height;
+}
+
+// Zoom x/y by factor while keeping world point wx/wy fixed at its current screen position.
+inline void vp_zoom_at_x(Viewport& vp, float wx, float factor) {
+    vp.left = wx + (vp.left - wx) / factor;
+    vp.right = wx + (vp.right - wx) / factor;
+}
+
+inline void vp_zoom_at_y(Viewport& vp, float wy, float factor) {
+    vp.top = wy + (vp.top - wy) / factor;
+    vp.bottom = wy + (vp.bottom - wy) / factor;
+}

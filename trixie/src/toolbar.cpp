@@ -33,7 +33,7 @@ void draw_toolbar(NVGcontext* nvg, Box b, const Song& song, Tick cursor_tick, bo
     float cy = b.h * 0.5f;
 
     nvgFontFace(nvg, "ui");
-    nvgFontSize(nvg, 13.0f);
+    nvgFontSize(nvg, 24.0f);
     nvgTextAlign(nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
     nvgFillColor(nvg, nvgRGBf(0.75f, 0.80f, 0.88f)); // cool blue-white
     nvgText(nvg, 12.0f, cy, pos, nullptr);

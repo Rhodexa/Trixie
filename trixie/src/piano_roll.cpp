@@ -31,47 +31,32 @@ static constexpr float TRACK_COLORS[][4] = {
 static constexpr int TRACK_COLOR_COUNT = (int)(sizeof(TRACK_COLORS) / sizeof(TRACK_COLORS[0]));
 
 // ============================================================
-// Coordinate helpers (canvas-local)
-// World units: x = beats, y = semitones (0-127).
-// screen = world * zoom - scroll
-// ============================================================
-// DN: See ths is where the new viewport would come in handy.
-
-static float beat_to_x(float beat, const Camera& cam) {
-    return beat * cam.zoom_x - cam.scroll_x;
-}
-
-static float pitch_to_y(int pitch, const Camera& cam) {
-    return (127 - pitch) * cam.zoom_y - cam.scroll_y;
-}
-
-// ============================================================
 // Internal draw helpers — work in local origin coords after nvgTranslate
 // ============================================================
 
-static void draw_pitch_lanes(NVGcontext* nvg, const Camera& cam, int w, int h) {
-    int first_pitch = 127 - (int)floorf(cam.scroll_y / cam.zoom_y);
-    int last_pitch  = 127 - (int)floorf((cam.scroll_y + (float)h) / cam.zoom_y) - 1;
-    first_pitch = std::min(first_pitch, 127);
-    last_pitch  = std::max(last_pitch,  0);
+static void draw_pitch_lanes(NVGcontext* nvg, const Viewport& vp, int w, int h) {
+    float row_h = vp_zoom_y(vp);
+    // Conservative visible pitch range; scissor handles any overdraw.
+    int first_pitch = std::min((int)vp.top, 127);
+    int last_pitch  = std::max((int)vp.bottom - 1, 0);
 
     for (int pitch = last_pitch; pitch <= first_pitch; pitch++) {
-        float y = pitch_to_y(pitch, cam);
+        float y = vp_to_screen_y(vp, (float)(pitch + 1));  // top edge of row
         nvgBeginPath(nvg);
-        nvgRect(nvg, 0.0f, y, (float)w, cam.zoom_y);
+        nvgRect(nvg, 0.0f, y, (float)w, row_h);
         nvgFillColor(nvg, SCALE_LUT[pitch % 12]
-            ? nvgRGBf(0.055f, 0.063f, 0.080f)
-            : nvgRGBf(0.082f, 0.094f, 0.122f));
+            ? nvgRGBf(0.078f, 0.090f, 0.114f)
+            : nvgRGBf(0.102f, 0.114f, 0.145f));
         nvgFill(nvg);
     }
 }
 
-static void draw_grid_lines(NVGcontext* nvg, const Camera& cam, int w, int h) {
-    float first_beat = cam.scroll_x / cam.zoom_x;
-    float last_beat  = (cam.scroll_x + (float)w) / cam.zoom_x;
+static void draw_grid_lines(NVGcontext* nvg, const Viewport& vp, int w, int h) {
+    float first_beat = vp_to_world_x(vp, 0.0f);
+    float last_beat  = vp_to_world_x(vp, (float)w);
 
     for (float beat = floorf(first_beat); beat <= last_beat; beat += 1.0f) {
-        float x      = beat_to_x(beat, cam);
+        float x      = vp_to_screen_x(vp, beat);
         bool  is_bar = ((int)beat % 4 == 0);
 
         nvgBeginPath(nvg);
@@ -85,7 +70,9 @@ static void draw_grid_lines(NVGcontext* nvg, const Camera& cam, int w, int h) {
     }
 }
 
-static void draw_notes(NVGcontext* nvg, const Song& song, const Camera& cam, int w, int h) {
+static void draw_notes(NVGcontext* nvg, const Song& song, const Viewport& vp, int w, int h) {
+    float row_h = vp_zoom_y(vp);
+
     for (int t = 0; t < (int)song.tracks.size(); t++) {
         const float* c = TRACK_COLORS[t % TRACK_COLOR_COUNT];
 
@@ -93,10 +80,10 @@ static void draw_notes(NVGcontext* nvg, const Song& song, const Camera& cam, int
             float beats_start = (float)note.start    / (float)song.ppq;
             float beats_dur   = (float)note.duration / (float)song.ppq;
 
-            float x  = beat_to_x(beats_start, cam);
-            float y  = pitch_to_y(note.pitch, cam);
-            float nw = std::max(beats_dur * cam.zoom_x, 2.0f);
-            float nh = cam.zoom_y;
+            float x  = vp_to_screen_x(vp, beats_start);
+            float y  = vp_to_screen_y(vp, (float)(note.pitch + 1));  // top edge
+            float nw = std::max(beats_dur * vp_zoom_x(vp), 2.0f);
+            float nh = row_h;
 
             if (x + nw < 0.0f || x > (float)w) continue;
             if (y + nh < 0.0f || y > (float)h) continue;
@@ -137,6 +124,15 @@ static constexpr KeyDef KEY_DEFS[12] = {
 };
 
 static void draw_octave(NVGcontext* nvg, float x, float y, float width, float height, uint16_t on_keys = 0) {
+
+    // bg to prevent visual glitches:
+    nvgBeginPath(nvg);
+    nvgRect(nvg, x, y, width, height);
+    nvgFillColor(nvg, nvgRGBf(0.96f, 0.95f,  0.93f ));
+    nvgFill(nvg);
+    nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.0f));
+
+    // whites first
     for (int i = 0; i < 12; i++) {
         const KeyDef& k = KEY_DEFS[i];
         if (k.black) continue;
@@ -146,10 +142,23 @@ static void draw_octave(NVGcontext* nvg, float x, float y, float width, float he
         else if (i == 0 || i == 5)   nvgFillColor(nvg, nvgRGBf(0.85f, 0.85f,  0.85f ));
         else                         nvgFillColor(nvg, nvgRGBf(0.96f, 0.95f,  0.93f ));
         nvgFill(nvg);
-        nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.1f));
-        nvgStrokeWidth(nvg, 1.0f);
-        nvgStroke(nvg);
     }
+
+    NVGpaint black_grad = nvgLinearGradient(nvg,
+        x, 0,
+        width * 0.66f, 0,
+        nvgRGBf(0.125f, 0.125f, 0.125f),
+        nvgRGBf(0.188f, 0.188f, 0.188f)
+    );
+
+    NVGpaint black_stroke = nvgLinearGradient(nvg,
+        x, 0,
+        width * 0.66f, 0,
+        nvgRGBf(0.427f, 0.427f, 0.427f),
+        nvgRGBf(0.000f, 0.000f, 0.000f)
+    );
+
+    // blacks on top
     for (int i = 0; i < 12; i++) {
         const KeyDef& k = KEY_DEFS[i];
         if (!k.black) continue;
@@ -160,19 +169,28 @@ static void draw_octave(NVGcontext* nvg, float x, float y, float width, float he
             nvgStrokeColor(nvg, nvgRGBf(0.000f, 0.514f, 0.592f));
         }
         else {
-            nvgFillColor(nvg, nvgRGBf(0.10f, 0.09f,  0.09f ));
-            nvgStrokeColor(nvg, nvgRGBf(0.302f, 0.302f, 0.302f));
+            nvgFillPaint(nvg, black_grad);
+            nvgStrokePaint(nvg, black_stroke);
         }
         nvgStrokeWidth(nvg, 1.0f);
         nvgFill(nvg);
         nvgStroke(nvg);
     }
+    nvgBeginPath(nvg);
+    nvgMoveTo(nvg, x, y);
+    nvgLineTo(nvg, x, y + height);
+    nvgStrokeColor(nvg, nvgRGBf(0.467f, 0.114f, 0.114f));
+    nvgStrokeWidth(nvg, 4.0f);
+    nvgStroke(nvg);
 }
 
-static void draw_piano_strip_impl(NVGcontext* nvg, const Camera& cam, float strip_w, float strip_h) {
+// oct 0-10 (bottom to top); top of octave oct is at pitch (oct+1)*12.
+static void draw_piano_strip_impl(NVGcontext* nvg, const Viewport& vp, float strip_w) {
     nvgSave(nvg);
+    float row_h = vp_zoom_y(vp);
     for (int oct = 0; oct < 11; oct++) {
-        draw_octave(nvg, 0, ((128 - 12 - oct * 12) * cam.zoom_y) - cam.scroll_y, strip_w, 12.0f * cam.zoom_y, 0);
+        float y = vp_to_screen_y(vp, (float)((oct + 1) * 12));  // top of octave band
+        draw_octave(nvg, 0, y, strip_w, 12.0f * row_h, 0);
     }
     nvgRestore(nvg);
 }
@@ -238,8 +256,8 @@ static void piano_roll_header_draw(NVGcontext* nvg, ARegion& region,
 
 static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region,
                                        const SpacePianoRoll& space, const Song& song) {
-    const Box&    b   = region.winrct;
-    const Camera& cam = space.camera;
+    const Box&      b  = region.winrct;
+    const Viewport& vp = space.viewport;
 
     nvgSave(nvg);
     nvgScissor(nvg, b.x, b.y, b.w, b.h);
@@ -259,16 +277,15 @@ static void piano_roll_timeruler_draw(NVGcontext* nvg, ARegion& region,
     nvgStrokeWidth(nvg, 1.0f);
     nvgStroke(nvg);
 
-    // Beat markers — offset by strip_width to align with canvas
+    // Beat markers — offset by strip_width to align with canvas x-axis.
     float rx         = space.strip_width;
-    float canvas_w   = b.w - rx;
-    float first_beat = cam.scroll_x / cam.zoom_x;
-    float last_beat  = (cam.scroll_x + canvas_w) / cam.zoom_x;
+    float first_beat = vp_to_world_x(vp, 0.0f);
+    float last_beat  = vp_to_world_x(vp, b.w - rx);
 
     nvgFontSize(nvg, 12.0f);
 
     for (float beat = floorf(first_beat); beat <= last_beat; beat += 1.0f) {
-        float x      = rx + beat * cam.zoom_x - cam.scroll_x;
+        float x      = rx + vp_to_screen_x(vp, beat);
         bool  is_bar = ((int)beat % 4 == 0);
 
         float tick_h = is_bar ? b.h * 0.4f : b.h * 0.3f;
@@ -297,7 +314,7 @@ static void piano_roll_channels_draw(NVGcontext* nvg, ARegion& region, const Spa
     nvgSave(nvg);
     nvgScissor(nvg, b.x, b.y, b.w, b.h);
     nvgTranslate(nvg, b.x, b.y);
-    draw_piano_strip_impl(nvg, space.camera, b.w, b.h);
+    draw_piano_strip_impl(nvg, space.viewport, b.w);
     nvgRestore(nvg);
 }
 
@@ -306,9 +323,9 @@ static void piano_roll_window_draw(NVGcontext* nvg, ARegion& region, const Space
     nvgSave(nvg);
     nvgScissor(nvg, b.x, b.y, b.w, b.h);
     nvgTranslate(nvg, b.x, b.y);
-    draw_pitch_lanes(nvg, space.camera, (int)b.w, (int)b.h);
-    draw_grid_lines (nvg, space.camera, (int)b.w, (int)b.h);
-    draw_notes      (nvg, song, space.camera, (int)b.w, (int)b.h);
+    draw_pitch_lanes(nvg, space.viewport, (int)b.w, (int)b.h);
+    draw_grid_lines (nvg, space.viewport, (int)b.w, (int)b.h);
+    draw_notes      (nvg, song, space.viewport, (int)b.w, (int)b.h);
     nvgRestore(nvg);
 }
 
@@ -355,7 +372,12 @@ static void piano_roll_scrollbar_draw(NVGcontext* nvg, ARegion& region,
 
 static bool piano_roll_window_handle_event(ARegion& region, SpacePianoRoll& space,
                                             Song& song, Journal& journal,
-                                            const InputEvent& raw) {
+                                            const InputEvent& raw)
+{
+    if(auto* me = std::get_if<MouseMoveEvent>(&raw)) space.mouse_x = me->x - region.winrct.x;
+
+    if(auto* me = std::get_if<MouseMoveEvent>(&raw)) space.mouse_y = me->y - region.winrct.y;
+    
     wmEvent     ev  = wm_event_from_input(raw);
     wmOpContext ctx { region, space, song, journal };
     return wm_handle_event(ctx, ev, piano_roll_keymap(), space.active_modal_op);
@@ -367,15 +389,15 @@ static bool piano_roll_window_handle_event(ARegion& region, SpacePianoRoll& spac
 
 void piano_roll_draw_ghost(NVGcontext* nvg, ARegion& window,
                             const SpacePianoRoll& space, const Song& song, const Note& note) {
-    const Box&    b   = window.winrct;
-    const Camera& cam = space.camera;
+    const Box&      b  = window.winrct;
+    const Viewport& vp = space.viewport;
 
     float beats_start = (float)note.start    / (float)song.ppq;
     float beats_dur   = (float)note.duration / (float)song.ppq;
-    float x  = beat_to_x(beats_start, cam);
-    float y  = pitch_to_y(note.pitch,  cam);
-    float w  = std::max(beats_dur * cam.zoom_x, 2.0f);
-    float h  = cam.zoom_y;
+    float x  = vp_to_screen_x(vp, beats_start);
+    float y  = vp_to_screen_y(vp, (float)(note.pitch + 1));
+    float w  = std::max(beats_dur * vp_zoom_x(vp), 2.0f);
+    float h  = vp_zoom_y(vp);
 
     float inset  = 1.5f;
     float nw     = std::max(w - inset * 2.0f, 1.0f);
@@ -395,14 +417,11 @@ void piano_roll_draw_ghost(NVGcontext* nvg, ARegion& window,
     nvgRestore(nvg);
 }
 
-/*
-    This draws two cursors:
-*/
-void piano_roll_draw_cursor(NVGcontext* nvg, ARegion& window,
+void piano_roll_draw_playback_cursor(NVGcontext* nvg, ARegion& window,
                              const SpacePianoRoll& space, const Song& song, Tick cursor_tick) {
-    const Box&    b   = window.winrct;
-    const Camera& cam = space.camera;
-    float x = beat_to_x((float)cursor_tick / (float)song.ppq, cam);
+    const Box&      b  = window.winrct;
+    const Viewport& vp = space.viewport;
+    float x = vp_to_screen_x(vp, (float)cursor_tick / (float)song.ppq);
     if (x < 0.0f || x > b.w) return;
 
     nvgSave(nvg);
@@ -411,25 +430,56 @@ void piano_roll_draw_cursor(NVGcontext* nvg, ARegion& window,
 
     float trailLength = 10.0f;
 
-    NVGpaint gradient = nvgLinearGradient(nvg, 
+    NVGpaint gradient = nvgLinearGradient(nvg,
         x - trailLength, 0,
         x, 0,
         nvgRGBAf(1.0f, 0.78f, 0.18f, 0.0f),
         nvgRGBAf(1.0f, 0.78f, 0.18f, 0.4f)
     );
 
-    // 3. Draw the Trail Rectangle
     nvgBeginPath(nvg);
     nvgRect(nvg, x - trailLength, 0, trailLength, b.h);
     nvgFillPaint(nvg, gradient);
     nvgFill(nvg);
 
-    // 4. Draw vertical line
     nvgBeginPath(nvg);
     nvgMoveTo(nvg, x, 0.0f);
     nvgLineTo(nvg, x, b.h);
     nvgStrokeColor(nvg, nvgRGBAf(1.0f, 0.78f, 0.18f, 0.9f));
     nvgStrokeWidth(nvg, 1.5f);
+    nvgStroke(nvg);
+
+    nvgRestore(nvg);
+}
+
+void piano_roll_draw_canvas_crosshair(NVGcontext* nvg, ARegion& window, const SpacePianoRoll& space) {
+    const Box&      b  = window.winrct;
+    const Viewport& vp = space.viewport;
+
+    if(!space.mouse_x) return;
+    if(!space.mouse_y) return;
+    float x = *space.mouse_x;
+    float y = *space.mouse_y;
+    if (y < 0.0f || y > b.h) return;
+    if (x < 0.0f || x > b.w) return;
+
+    nvgSave(nvg);
+
+    nvgScissor(nvg, b.x, b.y, b.w, b.h);
+    nvgTranslate(nvg, b.x, b.y);
+
+    nvgBeginPath(nvg);
+    nvgMoveTo(nvg, x, 0.0f);
+    nvgLineTo(nvg, x, b.h);
+    nvgStrokeColor(nvg, nvgRGBAf(1.000f, 1.000f, 1.000f, 0.1f));
+    nvgStrokeWidth(nvg, 0.7f);
+    nvgStroke(nvg);
+
+    nvgBeginPath(nvg);
+    nvgMoveTo(nvg, 0.0f, y);
+    nvgLineTo(nvg, b.w, y);
+    nvgStrokeColor(nvg, nvgRGBAf(1.000f, 1.000f, 1.000f, 0.1f));
+    nvgStrokeWidth(nvg, 0.7f);
     nvgStroke(nvg);
 
     nvgRestore(nvg);
@@ -443,15 +493,15 @@ static constexpr float HANDLE_WIDTH = 8.0f;
 
 std::optional<NoteHit> piano_roll_hit_test(const Song& song, const SpacePianoRoll& space,
                                             float cx, float cy) {
-    const Camera& cam = space.camera;
+    const Viewport& vp = space.viewport;
     for (int t = 0; t < (int)song.tracks.size(); t++) {
         const auto& notes = song.tracks[t].notes;
         for (int i = 0; i < (int)notes.size(); i++) {
             const Note& n = notes[i];
-            float x0 = beat_to_x((float)n.start                / (float)song.ppq, cam);
-            float x1 = beat_to_x((float)(n.start + n.duration) / (float)song.ppq, cam);
-            float y0 = pitch_to_y(n.pitch, cam);
-            float y1 = y0 + cam.zoom_y;
+            float x0 = vp_to_screen_x(vp, (float)n.start                / (float)song.ppq);
+            float x1 = vp_to_screen_x(vp, (float)(n.start + n.duration) / (float)song.ppq);
+            float y0 = vp_to_screen_y(vp, (float)(n.pitch + 1));  // top edge
+            float y1 = vp_to_screen_y(vp, (float)n.pitch);         // bottom edge
             if (cx < x0 || cx >= x1 || cy < y0 || cy >= y1) continue;
 
             float w = x1 - x0;
@@ -469,16 +519,14 @@ std::optional<NoteHit> piano_roll_hit_test(const Song& song, const SpacePianoRol
 
 Tick piano_roll_x_to_tick(const Song& song, const SpacePianoRoll& space,
                             float cx, Tick snap_ticks) {
-    const Camera& cam = space.camera;
-    float beat = (cx + cam.scroll_x) / cam.zoom_x;
+    float beat = vp_to_world_x(space.viewport, cx);
     Tick raw   = (Tick)(beat * (float)song.ppq);
     if (raw < 0) raw = 0;
     return snap_to_nearest(raw, snap_ticks);
 }
 
 int piano_roll_y_to_pitch(const SpacePianoRoll& space, float cy) {
-    const Camera& cam = space.camera;
-    int pitch = 127 - (int)floorf((cy + cam.scroll_y) / cam.zoom_y);
+    int pitch = (int)floorf(vp_to_world_y(space.viewport, cy));
     return std::clamp(pitch, 0, 127);
 }
 
@@ -486,10 +534,9 @@ std::optional<Note> piano_roll_make_note(const Song& song, const SpacePianoRoll&
                                           float cx, float cy,
                                           Tick snap_ticks, Tick dur_ticks, int velocity) {
     if (cx < 0.0f) return std::nullopt;
-    const Camera& cam = space.camera;
-    int pitch = 127 - (int)floorf((cy + cam.scroll_y) / cam.zoom_y);
+    int pitch = (int)floorf(vp_to_world_y(space.viewport, cy));
     if (pitch < 0 || pitch > 127) return std::nullopt;
-    float beat    = (cx + cam.scroll_x) / cam.zoom_x;
+    float beat    = vp_to_world_x(space.viewport, cx);
     Tick raw_tick = (Tick)(beat * (float)song.ppq);
     return Note{ snap_to_nearest(raw_tick, snap_ticks), dur_ticks, pitch, velocity, 0 };
 }

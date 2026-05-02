@@ -21,7 +21,13 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 static OpResult view2d_scroll_y_invoke(wmOperator&, wmOpContext& ctx, const wmEvent& ev) {
-    ctx.space.camera.scroll_y = std::max(0.0f, ctx.space.camera.scroll_y - ev.dy * 30.0f);
+    Viewport& vp    = ctx.space.viewport;
+    float     zoom  = vp_zoom_y(vp);
+    float     delta = ev.dy * 30.0f / zoom;
+    float     range = vp.top - vp.bottom;
+    float     new_t = std::min(128.0f, vp.top + delta);
+    vp.top = new_t;
+    vp.bottom = new_t - range;
     return OpResult::Finished;
 }
 
@@ -34,7 +40,13 @@ static OperatorType VIEW2D_SCROLL_Y_OT = {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 static OpResult view2d_scroll_x_invoke(wmOperator&, wmOpContext& ctx, const wmEvent& ev) {
-    ctx.space.camera.scroll_x = std::max(0.0f, ctx.space.camera.scroll_x - ev.dy * 60.0f);
+    Viewport& vp    = ctx.space.viewport;
+    float     zoom  = vp_zoom_x(vp);
+    float     delta = ev.dy * 60.0f / zoom;
+    float     range = vp.right - vp.left;
+    float     new_l = std::max(0.0f, vp.left - delta);
+    vp.left = new_l;
+    vp.right = new_l + range;
     return OpResult::Finished;
 }
 
@@ -45,16 +57,21 @@ static OperatorType VIEW2D_SCROLL_X_OT = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // view2d.zoom_y  —  Shift+scroll → vertical zoom toward cursor
 // ═══════════════════════════════════════════════════════════════════════════════
-// ToDo: Make zoom out clamp to content.
-// Perhaps camera shouldn't be scroll+zoom but "viewport" width x, y, width and height in pixels. Like UV mapping.
-// fitting content then becomes a linear interpolation, and 100% zoom out happens when all vertices of the viewport match the bounding box of the content.
+// ToDo: Make zoom out clamp to content — 100% zoom out when viewport matches content bounding box.
 static OpResult view2d_zoom_y_invoke(wmOperator&, wmOpContext& ctx, const wmEvent& ev) {
     const Box& b    = ctx.region.winrct;
-    float screen_cy = ev.y - b.y;
-    float world_cy  = (screen_cy + ctx.space.camera.scroll_y) / ctx.space.camera.zoom_y;
+    Viewport&  vp   = ctx.space.viewport;
+    float wy        = vp_to_world_y(vp, ev.y - b.y);
     float factor    = (ev.dy > 0.0f) ? 1.15f : (1.0f / 1.15f);
-    ctx.space.camera.zoom_y   = std::clamp(ctx.space.camera.zoom_y * factor, 4.0f, 80.0f);
-    ctx.space.camera.scroll_y = std::max(0.0f, world_cy * ctx.space.camera.zoom_y - screen_cy);
+    float screen_h  = vp.screen_b - vp.screen_t;
+    float old_range = vp.top - vp.bottom;
+    float new_range = std::clamp(old_range / factor, screen_h / 80.0f, screen_h / 4.0f);
+    vp_zoom_at_y(vp, wy, old_range / new_range);
+    if (vp.top > 128.0f) {
+        float diff = vp.top - 128.0f;
+        vp.top  = 128.0f;
+        vp.bottom -= diff;
+    }
     return OpResult::Finished;
 }
 
@@ -68,11 +85,18 @@ static OperatorType VIEW2D_ZOOM_Y_OT = {
 
 static OpResult view2d_zoom_x_invoke(wmOperator&, wmOpContext& ctx, const wmEvent& ev) {
     const Box& b    = ctx.region.winrct;
-    float screen_cx = ev.x - b.x;
-    float world_cx  = (screen_cx + ctx.space.camera.scroll_x) / ctx.space.camera.zoom_x;
+    Viewport&  vp   = ctx.space.viewport;
+    float wx        = vp_to_world_x(vp, ev.x - b.x);
     float factor    = (ev.dy > 0.0f) ? 1.15f : (1.0f / 1.15f);
-    ctx.space.camera.zoom_x   = std::clamp(ctx.space.camera.zoom_x * factor, 10.0f, 1000.0f);
-    ctx.space.camera.scroll_x = std::max(0.0f, world_cx * ctx.space.camera.zoom_x - screen_cx);
+    float screen_w  = vp.screen_r - vp.screen_l;
+    float old_range = vp.right - vp.left;
+    float new_range = std::clamp(old_range / factor, screen_w / 1000.0f, screen_w / 10.0f);
+    vp_zoom_at_x(vp, wx, old_range / new_range);
+    if (vp.left < 0.0f) {
+        float diff = -vp.left;
+        vp.left  = 0.0f;
+        vp.right += diff;
+    }
     return OpResult::Finished;
 }
 
@@ -93,8 +117,15 @@ static OpResult view2d_pan_invoke(wmOperator& op, wmOpContext&, const wmEvent&) 
 
 static OpResult view2d_pan_modal(wmOperator&, wmOpContext& ctx, const wmEvent& ev) {
     if (ev.type == EventType::MouseMove) {
-        ctx.space.camera.scroll_x = std::max(0.0f, ctx.space.camera.scroll_x - ev.dx);
-        ctx.space.camera.scroll_y = std::max(0.0f, ctx.space.camera.scroll_y - ev.dy);
+        Viewport& vp      = ctx.space.viewport;
+        float     range_x = vp.right - vp.left;
+        float     range_y = vp.top - vp.bottom;
+        float     new_l   = std::max(0.0f, vp.left - ev.dx / vp_zoom_x(vp));
+        float     new_t   = std::min(128.0f, vp.top + ev.dy / vp_zoom_y(vp));
+        vp.left = new_l;
+        vp.right = new_l + range_x;
+        vp.top = new_t;
+        vp.bottom = new_t - range_y;
         return OpResult::Running;
     }
     if (ev.type == EventType::MiddleMouse && ev.value == EventValue::Release)

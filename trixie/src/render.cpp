@@ -57,12 +57,30 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
         for (int i = 0; i < PIANO_ROLL_REGION_COUNT; i++)
             regions[i].runtime_type = &space_type->region_types[i];
 
-        // Camera init — once, after first layout so we have the window region size
-        if (!space.camera_initialized) {
-            float h = regions[(int)RegionType::Window].winrct.h;
-            float center_y = (127 - 60) * space.camera.zoom_y - h * 0.5f;
-            space.camera.scroll_y    = std::max(0.0f, center_y);
-            space.camera_initialized = true;
+        // Viewport init/sync — init once, then sync screen rect every frame.
+        {
+            const Box& wbox = regions[(int)RegionType::Window].winrct;
+            if (!space.viewport_initialized) {
+                constexpr float zoom_x = 20.0f, zoom_y = 20.0f;
+                float scroll_y = std::max(0.0f, (127.0f - 60.0f) * zoom_y - wbox.h * 0.5f);
+                space.viewport = {
+                    0.0f,                                      // left
+                    128.0f - scroll_y / zoom_y,                // top
+                    wbox.w / zoom_x,                           // right
+                    128.0f - (scroll_y + wbox.h) / zoom_y,    // bottom
+                    0.0f, 0.0f, wbox.w, wbox.h,               // screen
+                };
+                space.viewport_initialized = true;
+            } else {
+                // Maintain zoom, expand/contract visible world to match new canvas size.
+                Viewport& vp = space.viewport;
+                float zoom_x = vp_zoom_x(vp);
+                float zoom_y = vp_zoom_y(vp);
+                vp.screen_r  = wbox.w;
+                vp.screen_b  = wbox.h;
+                vp.right   = vp.left + wbox.w / zoom_x;
+                vp.bottom   = vp.top - wbox.h / zoom_y;
+            }
         }
 
         // Sync playback state into space data before draw
@@ -111,11 +129,14 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
                 rt->draw(nvg, regions[i], space, song);
         }
 
+
         // Overlays drawn on top of the Window region
+        piano_roll_draw_canvas_crosshair(nvg, win, space);
+
         if (space.pending_note)
             piano_roll_draw_ghost(nvg, win, space, song, *space.pending_note);
         if (space.is_playing)
-            piano_roll_draw_cursor(nvg, win, space, song, space.cursor_tick);
+            piano_roll_draw_playback_cursor(nvg, win, space, song, space.cursor_tick);
 
         nvgEndFrame(nvg);
         glfwSwapBuffers(window.handle);

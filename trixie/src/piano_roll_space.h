@@ -4,16 +4,15 @@
 
 #pragma once
 
-//#include "viewport.h" // <- addition
-#include "camera.h"
+#include "viewport.h"
 #include "note.h"
 #include "wm.h"
 #include <optional>
 
 struct SpacePianoRoll {
-    Camera camera;
-    float  strip_width        = 68.0f;
-    bool   camera_initialized = false;
+    Viewport viewport;
+    float    strip_width          = 68.0f;
+    bool     viewport_initialized = false;
 
     // Playback observation — written by render.cpp each frame before draw.
     Tick cursor_tick = 0;
@@ -24,4 +23,7 @@ struct SpacePianoRoll {
 
     // Active modal operator — owned by the wm dispatch loop.
     std::optional<wmOperator> active_modal_op;
+
+    std::optional<float> mouse_x;
+    std::optional<float> mouse_y;
 };

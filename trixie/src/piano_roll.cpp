@@ -39,8 +39,8 @@ static constexpr int TRACK_COLOR_COUNT = (int)(sizeof(TRACK_COLORS) / sizeof(TRA
 static void draw_pitch_lanes(NVGcontext* nvg, const Viewport& vp, int w, int h) {
     float row_h = vp_zoom_y(vp);
     // Conservative visible pitch range; scissor handles any overdraw.
-    int first_pitch = std::min((int)vp.top, 127);
-    int last_pitch  = std::max((int)vp.bottom - 1, 0);
+    int first_pitch = std::min((int)vp.world_t, 127);
+    int last_pitch  = std::max((int)vp.world_b - 1, 0);
 
     for (int pitch = last_pitch; pitch <= first_pitch; pitch++) {
         float y = vp_to_screen_y(vp, (float)(pitch + 1));  // top edge of row
@@ -194,6 +194,12 @@ static void draw_piano_strip_impl(NVGcontext* nvg, const Viewport& vp, float str
         float y = vp_to_screen_y(vp, (float)((oct + 1) * 12));  // top of octave band
         draw_octave(nvg, 0, y, strip_w, 12.0f * row_h, 0);
     }
+    nvgBeginPath(nvg);
+    nvgMoveTo(nvg, strip_w, 0.0f);
+    nvgLineTo(nvg, strip_w, 128.0f * row_h);
+    nvgStrokeColor(nvg, theme().surface_border);
+    nvgStrokeWidth(nvg, 1.0f);
+    nvgStroke(nvg);
     nvgRestore(nvg);
 }
 

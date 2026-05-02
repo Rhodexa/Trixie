@@ -80,8 +80,8 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
                 float zoom_y = vp_zoom_y(vp);
                 vp.screen_r  = wbox.w;
                 vp.screen_b  = wbox.h;
-                vp.right   = vp.left + wbox.w / zoom_x;
-                vp.bottom   = vp.top - wbox.h / zoom_y;
+                vp.world_r   = vp.world_l + wbox.w / zoom_x;
+                vp.world_b   = vp.world_t - wbox.h / zoom_y;
             }
         }
 

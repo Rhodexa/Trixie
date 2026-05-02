@@ -24,10 +24,10 @@ static OpResult view2d_scroll_y_invoke(wmOperator&, wmOpContext& ctx, const wmEv
     /*Viewport& vp    = ctx.space.viewport;
     float     zoom  = vp_zoom_y(vp);
     float     delta = ev.dy * 30.0f / zoom;
-    float     range = vp.top - vp.bottom;
-    float     new_t = std::min(128.0f, vp.top + delta);
-    vp.top = new_t;
-    vp.bottom = new_t - range;*/
+    float     range = vp.world_t - vp.world_b;
+    float     new_t = std::min(128.0f, vp.world_t + delta);
+    vp.world_t = new_t;
+    vp.world_b = new_t - range;*/
 
     // Let's test the new viewport tools!
     // work-in-progress. This (or rather, the viewport) should clamp itself to not go off screen
@@ -51,10 +51,10 @@ static OpResult view2d_scroll_x_invoke(wmOperator&, wmOpContext& ctx, const wmEv
     Viewport& vp    = ctx.space.viewport;
     float     zoom  = vp_zoom_x(vp);
     float     delta = ev.dy * 60.0f / zoom;
-    float     range = vp.right - vp.left;
-    float     new_l = std::max(0.0f, vp.left - delta);
-    vp.left = new_l;
-    vp.right = new_l + range;
+    float     range = vp.world_r - vp.world_l;
+    float     new_l = std::max(0.0f, vp.world_l - delta);
+    vp.world_l = new_l;
+    vp.world_r = new_l + range;
     return OpResult::Finished;
 }
 
@@ -72,13 +72,13 @@ static OpResult view2d_zoom_y_invoke(wmOperator&, wmOpContext& ctx, const wmEven
     float wy        = vp_to_world_y(vp, ev.y - b.y);
     float factor    = (ev.dy > 0.0f) ? 1.15f : (1.0f / 1.15f);
     float screen_h  = vp.screen_b - vp.screen_t;
-    float old_range = vp.top - vp.bottom;
+    float old_range = vp.world_t - vp.world_b;
     float new_range = std::clamp(old_range / factor, screen_h / 80.0f, screen_h / 4.0f);
     vp_zoom_at_y(vp, wy, old_range / new_range);
-    if (vp.top > 128.0f) {
-        float diff = vp.top - 128.0f;
-        vp.top  = 128.0f;
-        vp.bottom -= diff;
+    if (vp.world_t > 128.0f) {
+        float diff = vp.world_t - 128.0f;
+        vp.world_t  = 128.0f;
+        vp.world_b -= diff;
     }
     return OpResult::Finished;
 }
@@ -97,13 +97,13 @@ static OpResult view2d_zoom_x_invoke(wmOperator&, wmOpContext& ctx, const wmEven
     float wx        = vp_to_world_x(vp, ev.x - b.x);
     float factor    = (ev.dy > 0.0f) ? 1.15f : (1.0f / 1.15f);
     float screen_w  = vp.screen_r - vp.screen_l;
-    float old_range = vp.right - vp.left;
+    float old_range = vp.world_r - vp.world_l;
     float new_range = std::clamp(old_range / factor, screen_w / 1000.0f, screen_w / 10.0f);
     vp_zoom_at_x(vp, wx, old_range / new_range);
-    if (vp.left < 0.0f) {
-        float diff = -vp.left;
-        vp.left  = 0.0f;
-        vp.right += diff;
+    if (vp.world_l < 0.0f) {
+        float diff = -vp.world_l;
+        vp.world_l  = 0.0f;
+        vp.world_r += diff;
     }
     return OpResult::Finished;
 }
@@ -127,14 +127,14 @@ static OpResult view2d_pan_invoke(wmOperator& op, wmOpContext&, const wmEvent&) 
 static OpResult view2d_pan_modal(wmOperator&, wmOpContext& ctx, const wmEvent& ev) {
     if (ev.type == EventType::MouseMove) {
         Viewport& vp      = ctx.space.viewport;
-        float     range_x = vp.right - vp.left;
-        float     range_y = vp.top - vp.bottom;
-        float     new_l   = std::max(0.0f, vp.left - ev.dx / vp_zoom_x(vp));
-        float     new_t   = std::min(128.0f, vp.top + ev.dy / vp_zoom_y(vp));
-        vp.left = new_l;
-        vp.right = new_l + range_x;
-        vp.top = new_t;
-        vp.bottom = new_t - range_y;
+        float     range_x = vp.world_r - vp.world_l;
+        float     range_y = vp.world_t - vp.world_b;
+        float     new_l   = std::max(0.0f, vp.world_l - ev.dx / vp_zoom_x(vp));
+        float     new_t   = std::min(128.0f, vp.world_t + ev.dy / vp_zoom_y(vp));
+        vp.world_l = new_l;
+        vp.world_r = new_l + range_x;
+        vp.world_t = new_t;
+        vp.world_b = new_t - range_y;
         return OpResult::Running;
     }
     if (ev.type == EventType::MiddleMouse && ev.value == EventValue::Release)

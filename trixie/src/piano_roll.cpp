@@ -24,11 +24,11 @@ static bool SCALE_LUT[12] = {
 
 // Todo: Move these to the color library — There will be a proper channel coloring lib later on
 static constexpr float TRACK_COLORS[][4] = {
-    { 1.000f, 0.839f, 0.584f, 0.92f }, // warm gold
-    { 0.671f, 0.800f, 0.620f, 0.92f }, // sage green
-    { 0.608f, 0.800f, 0.882f, 0.92f }, // muted sky
-    { 0.867f, 0.659f, 0.482f, 0.92f }, // muted terracotta
-    { 0.780f, 0.722f, 0.878f, 0.92f }, // soft lavender
+    { 1.000f, 0.839f, 0.584f, 0.8f }, // warm gold
+    { 0.671f, 0.800f, 0.620f, 0.8f }, // sage green
+    { 0.608f, 0.800f, 0.882f, 0.8f }, // muted sky
+    { 0.867f, 0.659f, 0.482f, 0.8f }, // muted terracotta
+    { 0.780f, 0.722f, 0.878f, 0.8f }, // soft lavender
 };
 static constexpr int TRACK_COLOR_COUNT = (int)(sizeof(TRACK_COLORS) / sizeof(TRACK_COLORS[0]));
 
@@ -141,7 +141,7 @@ static void draw_octave(NVGcontext* nvg, float x, float y, float width, float he
         nvgBeginPath(nvg);
         nvgRect(nvg, x, y + k.y * height, width, k.h * height);
         if      (on_keys & (1 << i)) nvgFillColor(nvg, nvgRGBf(0.0f,  0.737f, 0.859f));
-        else if (i == 0 || i == 5)   nvgFillColor(nvg, nvgRGBf(0.85f, 0.85f,  0.85f ));
+        else if (i == 0)             nvgFillColor(nvg, nvgRGBf(0.85f, 0.85f,  0.85f ));
         else                         nvgFillColor(nvg, nvgRGBf(0.96f, 0.95f,  0.93f ));
         nvgFill(nvg);
     }
@@ -373,9 +373,11 @@ static void piano_roll_ui_draw(NVGcontext* nvg, ARegion& region, const SpacePian
     nvgRestore(nvg);
 }
 
-static void piano_roll_scrollbar_draw(NVGcontext* nvg, ARegion& region,
-                                       const SpacePianoRoll& /*space*/, const Song& /*song*/) {
+static void piano_roll_scrollbar_draw(NVGcontext* nvg, ARegion& region, const SpacePianoRoll& space, const Song& song) {
     const Box& b = region.winrct;
+    const Viewport& vp = space.viewport;
+    
+    // draw track
     nvgSave(nvg);
     nvgScissor(nvg, b.x, b.y, b.w, b.h);
     nvgTranslate(nvg, b.x, b.y);
@@ -384,6 +386,17 @@ static void piano_roll_scrollbar_draw(NVGcontext* nvg, ARegion& region,
     nvgRect(nvg, 0.0f, 0.0f, b.w, b.h);
     nvgFillColor(nvg, nvgRGBf(0.048f, 0.055f, 0.072f));
     nvgFill(nvg);
+    
+    // draw thumb
+    float y = vp.world_t / (vp.world_b - vp.world_t);
+    float h = (vp.world_b - vp.world_t) / (vp.screen_b - vp.screen_t);
+    nvgBeginPath(nvg);
+    nvgRect(nvg, 0.0f, y * b.h, b.w, h * b.h);
+    nvgFillColor(nvg, theme().bg_surface);
+    nvgStrokeColor(nvg, theme().surface_border);
+    nvgStrokeWidth(nvg, 1.0f);
+    nvgFill(nvg);
+    nvgStroke(nvg);
 
     nvgRestore(nvg);
 }

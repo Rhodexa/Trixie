@@ -98,7 +98,7 @@ inline void vp_scroll_axis_by(float& s_start, float& s_end, float& d_start, floa
     float factor = (s_end - s_start) / (d_end - d_start);
     float new_start = s_start  - delta * factor;
     float new_end   = new_start + span;
-    if(b_start < b_end) {
+    if(b_start != b_end) {
         if (new_start < b_start) {
             new_start = b_start;
             new_end   = new_start + span;
@@ -112,17 +112,17 @@ inline void vp_scroll_axis_by(float& s_start, float& s_end, float& d_start, floa
     s_end = new_end;
 }
 
-inline void vp_scroll_y_by(Viewport& vp, float delta) {
+inline void vp_scroll_x_by(Viewport& vp, float delta) {
     vp_scroll_axis_by(vp.world_l, vp.world_r, vp.screen_l, vp.screen_r, vp.bound_l, vp.bound_r, delta);
 }
 
-inline void vp_scroll_x_by(Viewport& vp, float delta) {
+inline void vp_scroll_y_by(Viewport& vp, float delta) {
     vp_scroll_axis_by(vp.world_t, vp.world_b, vp.screen_t, vp.screen_b, vp.bound_t, vp.bound_b, delta);
 }
 
 inline void vp_scroll_by(Viewport& vp, float dx, float dy) {
-    vp_scroll_y_by(vp, dx);
-    vp_scroll_x_by(vp, dy);
+    vp_scroll_x_by(vp, dx);
+    vp_scroll_y_by(vp, dy);
 }
 
 
@@ -135,4 +135,13 @@ inline void vp_zoom_at_x(Viewport& vp, float wx, float factor) {
 inline void vp_zoom_at_y(Viewport& vp, float wy, float factor) {
     vp.world_t = wy + (vp.world_t - wy) / factor;
     vp.world_b = wy + (vp.world_b - wy) / factor;
+}
+
+inline void vp_update(Viewport& vp) {
+    float zoom_x = vp_zoom_x(vp);
+    float zoom_y = vp_zoom_y(vp);
+    vp.screen_r  = wbox.w;
+    vp.screen_b  = wbox.h;
+    vp.world_r   = vp.world_l + wbox.w / zoom_x;
+    vp.world_b   = vp.world_t + wbox.h / zoom_y;
 }

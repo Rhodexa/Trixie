@@ -69,17 +69,21 @@ static OperatorType VIEW2D_SCROLL_X_OT = {
 static OpResult view2d_zoom_y_invoke(wmOperator&, wmOpContext& ctx, const wmEvent& ev) {
     const Box& b    = ctx.region.winrct;
     Viewport&  vp   = ctx.space.viewport;
+
     float wy        = vp_to_world_y(vp, ev.y - b.y);
     float factor    = (ev.dy > 0.0f) ? 1.15f : (1.0f / 1.15f);
     float screen_h  = vp.screen_b - vp.screen_t;
     float old_range = vp.world_t - vp.world_b;
     float new_range = std::clamp(old_range / factor, screen_h / 80.0f, screen_h / 4.0f);
+
     vp_zoom_at_y(vp, wy, old_range / new_range);
+
     if (vp.world_t > 128.0f) {
         float diff = vp.world_t - 128.0f;
         vp.world_t  = 128.0f;
         vp.world_b -= diff;
     }
+    
     return OpResult::Finished;
 }
 
@@ -127,14 +131,9 @@ static OpResult view2d_pan_invoke(wmOperator& op, wmOpContext&, const wmEvent&) 
 static OpResult view2d_pan_modal(wmOperator&, wmOpContext& ctx, const wmEvent& ev) {
     if (ev.type == EventType::MouseMove) {
         Viewport& vp      = ctx.space.viewport;
-        float     range_x = vp.world_r - vp.world_l;
-        float     range_y = vp.world_t - vp.world_b;
-        float     new_l   = std::max(0.0f, vp.world_l - ev.dx / vp_zoom_x(vp));
-        float     new_t   = std::min(128.0f, vp.world_t + ev.dy / vp_zoom_y(vp));
-        vp.world_l = new_l;
-        vp.world_r = new_l + range_x;
-        vp.world_t = new_t;
-        vp.world_b = new_t - range_y;
+
+        // updated to use the new viewport handlers
+        vp_scroll_by(vp, ev.dx, ev.dy);
         return OpResult::Running;
     }
     if (ev.type == EventType::MiddleMouse && ev.value == EventValue::Release)

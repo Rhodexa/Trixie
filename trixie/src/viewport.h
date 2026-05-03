@@ -135,6 +135,7 @@ inline void vp_zoom_at_x(Viewport& vp, float wx, float factor) {
 inline void vp_zoom_at_y(Viewport& vp, float wy, float factor) {
     vp.world_t = wy + (vp.world_t - wy) / factor;
     vp.world_b = wy + (vp.world_b - wy) / factor;
+    
 }
 
 inline void vp_update(Viewport& vp) {

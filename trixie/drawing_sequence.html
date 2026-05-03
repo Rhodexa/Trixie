@@ -1,0 +1,97 @@
+<!-- Important: don't use this doc as development reference - It might be broken or outdated already -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trixie's region drawing system</title>
+    <style>
+        *, *::after, *::before {
+            box-sizing: border-box;
+        }
+
+        :root{
+            --clr-primary: #ffae006e;
+            --clr-bg: #252525;
+        }
+
+        body {
+            margin: auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;            
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.6; 
+            background-color: var(--clr-bg);
+            color: white;
+            max-width: 800px;
+
+        }
+        .box {
+            padding: 1rem;
+            background-color: var(--clr-primary);
+            border: 2px solid #fff3;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            border-radius: 8px;
+            box-shadow: 0 5px 5px 0 #0001;
+        }
+        .arrow{
+            font-size: 2rem;
+        }
+        h{
+            font-weight: bold;
+            font-size: large;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <p>A brief tour of how Trixie's compositor. This is a guide for the director, and must NOT be used as a source for Trixie's compositor development</p>
+        <p>Trixie borrows windowing conventions from Blender, and follows a similar albeit a bit simplified pipeline</p>
+        <p>Trixie also uses a window-carving mechanism to assign spaces. Essentially the main window space is "carved" down to make space for now widgets</p>
+    </div>
+    <hr style="width: 800px; max-width: 80vw; margin-top: 1rem; margin-bottom: 1rem;">
+    <div class="box">
+        <h>Editor</h>
+        <div>
+            An editor context, typically subdivisible into a new window.
+        </div>
+    </div>
+    <div class="arrow">↓</div>
+    <div class="box" style="background-color: #ff480071;">
+        <h>Region</h>
+        <div>
+            A context container. It packs both drawing and stateful data about the drawing context for the editor childs
+        </div>
+    </div>
+    <div class="arrow">↓</div>
+    <div class="box" style="background-color: #ff004071;">
+        <h>Box</h>
+        <div>
+            A visual representation struct abuot _where_ the drawing space is and how big it is 
+        </div>
+    </div>
+    <div class="arrow">↓</div>
+    <div class="box" style="background-color: #8c00ff2c;">
+        <h>Viewport</h>
+        <div>
+            A complex class that handles viewing space. It represents the view space in World-Space, Screen-Space and keeps track of world bounds.
+            <br> * Viewport is queried by visual controllers to know about their required state
+            <br> * Viewport is controlled by controllers to move the view space around canvases
+            <br> * Viewport also works as a space transformer. It takes geometry in and spits transformed geometry out. It is used by renderer pipelines to squish worlds into the viewspace
+            <br> * Viewport also takes Box-space input and spits out world-space input.
+        </div>
+    </div>
+    <hr style="width: 800px; max-width: 80vw; margin-top: 1rem; margin-bottom: 1rem;">
+    <div>
+        <p>Input needs to pass by the Box through the viewport before reaching input handlers for any particular controller</p>
+    </div>
+    <hr style="width: 800px; max-width: 80vw; margin-top: 1rem; margin-bottom: 1rem;">
+</body>
+</html>

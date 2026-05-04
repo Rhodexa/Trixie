@@ -61,14 +61,19 @@ void render_thread_run(Window& window, std::atomic<bool>& running, Song& song,
         {
             const Box& wbox = regions[(int)RegionType::Window].winrct;
             if (!space.viewport_initialized) {
+                constexpr float zoom_x = 20.0f, zoom_y = 20.0f;
+                float scroll_y = std::max(0.0f, (127.0f - 60.0f) * zoom_y - wbox.h * 0.5f);
                 space.viewport = {
-                    0.0f, 0.0f, 100.0f, 128.0f,   
-                    0.0f, 0.0f, wbox.w, wbox.h,
-                    0.0f, 0.0f, 100.0f, 128.0f
+                    0.0f,                                     // world_l
+                    128.0f - scroll_y / zoom_y,               // world_t  (y-flip: high pitch at top)
+                    wbox.w / zoom_x,                          // world_r
+                    128.0f - (scroll_y + wbox.h) / zoom_y,   // world_b  (< world_t)
+                    0.0f, 0.0f, wbox.w, wbox.h,              // screen
+                    0.0f, 0.0f, 0.0f, 0.0f,                  // bounds (0 = infinite)
                 };
                 space.viewport_initialized = true;
             } else {
-                vp_update(space.viewport);                
+                vp_update(space.viewport, wbox.w, wbox.h);
             }
         }
 

@@ -135,14 +135,15 @@ inline void vp_zoom_at_x(Viewport& vp, float wx, float factor) {
 inline void vp_zoom_at_y(Viewport& vp, float wy, float factor) {
     vp.world_t = wy + (vp.world_t - wy) / factor;
     vp.world_b = wy + (vp.world_b - wy) / factor;
-    
+
 }
 
-inline void vp_update(Viewport& vp) {
+// Call every frame to sync screen size and maintain zoom when the canvas is resized.
+inline void vp_update(Viewport& vp, float new_w, float new_h) {
     float zoom_x = vp_zoom_x(vp);
     float zoom_y = vp_zoom_y(vp);
-    vp.screen_r  = wbox.w;
-    vp.screen_b  = wbox.h;
-    vp.world_r   = vp.world_l + wbox.w / zoom_x;
-    vp.world_b   = vp.world_t + wbox.h / zoom_y;
+    vp.screen_r  = new_w;
+    vp.screen_b  = new_h;
+    vp.world_r   = vp.world_l + new_w / zoom_x;
+    vp.world_b   = vp.world_t - new_h / zoom_y;  // minus: y-flip (world_b < world_t)
 }

@@ -72,12 +72,22 @@ static void draw_grid_lines(NVGcontext* nvg, const Viewport& vp, int w, int h) {
     }
 }
 
+// DN: Notes should be orderer by color in different channels
+// Right now we take on from MIDI, but later we need to parse that MIDI or whatever else into proper 
+// in-house sequences per channel.
+// To us, a channel is actually a plugin within the plugin rack.
+
 static void draw_notes(NVGcontext* nvg, const Song& song, const Viewport& vp, int w, int h) {
     float row_h = vp_zoom_y(vp);
 
     for (int t = 0; t < (int)song.tracks.size(); t++) {
         const float* c = TRACK_COLORS[t % TRACK_COLOR_COUNT];
 
+        nvgBeginPath(nvg);
+        nvgStrokeWidth(nvg, 1.0f);
+        nvgFillColor(nvg, nvgRGBAf(c[0], c[1], c[2], c[3]));
+        nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.45f));
+        bool do_round = vp_zoom_x(vp) < 1.0f;
         for (const Note& note : song.tracks[t].notes) {
             float beats_start = (float)note.start    / (float)song.ppq;
             float beats_dur   = (float)note.duration / (float)song.ppq;
@@ -86,23 +96,23 @@ static void draw_notes(NVGcontext* nvg, const Song& song, const Viewport& vp, in
             float y  = vp_to_screen_y(vp, (float)(note.pitch + 1));  // top edge
             float nw = std::max(beats_dur * vp_zoom_x(vp), 2.0f);
             float nh = row_h;
-
+            
             if (x + nw < 0.0f || x > (float)w) continue;
             if (y + nh < 0.0f || y > (float)h) continue;
-
+            
             float inset  = 1.5f;
             float rw     = std::max(nw - inset * 2.0f, 1.0f);
             float rh     = nh - inset * 2.0f;
             float radius = std::min(2.0f, std::min(rw, rh) * 0.5f);
-
-            nvgBeginPath(nvg);
-            nvgRoundedRect(nvg, x + inset, y + inset, rw, rh, radius);
-            nvgFillColor(nvg, nvgRGBAf(c[0], c[1], c[2], c[3]));
-            nvgFill(nvg);
-            nvgStrokeColor(nvg, nvgRGBAf(0.0f, 0.0f, 0.0f, 0.45f));
-            nvgStrokeWidth(nvg, 1.0f);
-            nvgStroke(nvg);
+            if(do_round) {
+                nvgRoundedRect(nvg, x + inset, y + inset, rw, rh, radius);
+            }
+            else {
+                nvgRect(nvg, x + inset, y + inset, rw, rh);
+            }
         }
+        nvgFill(nvg);
+        nvgStroke(nvg);
     }
 }
 
